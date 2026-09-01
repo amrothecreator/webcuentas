@@ -25,7 +25,6 @@ MESES_NUM = {
     "julio": 7, "agosto": 8, "septiembre": 9, "octubre": 10
 }
 
-# Conectar con Google Sheets usando las credenciales desde la variable de entorno
 def conectar():
     creds_dict = json.loads(CREDENTIALS_JSON)
     creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
@@ -36,12 +35,8 @@ class Cambio(BaseModel):
     nombre: str
     mes: str
     password: str
-    metodo: str  # Nuevo campo para "efectivo" o "transferencia"
+    metodo: str
 
-# Validar contraseña
-from pydantic import BaseModel
-
-# Asegúrate de tener este modelo definido
 class LoginData(BaseModel):
     password: str
 
@@ -51,7 +46,6 @@ def login(data: LoginData):
         raise HTTPException(status_code=401, detail="Contraseña incorrecta")
     return {"ok": True}
 
-# Servir el archivo index.html cuando entren a la raíz "/"
 @app.get("/")
 def read_index():
     return FileResponse("index.html")
@@ -82,6 +76,7 @@ def obtener_datos():
                 elif any("efectivo" in str(celda).lower() for celda in fila):
                     metodo = "efectivo"
                 
+                # Extras manuales de marzo y abril (no cambian)
                 extra_manual = 0
                 if mes == "marzo":
                     extra_manual = 500 if len(fila) > 3 and "500" in fila[3] else 0
@@ -93,10 +88,15 @@ def obtener_datos():
                 deuda_total = 0
 
                 if estado != "PAGADO":
-                    if mes_num < mes_actual:
+                    # REGLA NUEVA: Recargo automático SOLO si el mes es menor al actual Y es <= junio (mes 6)
+                    if mes_num < mes_actual and mes_num <= 6:
                         recargo_automatico = 500
-                    if len(fila) > 3 and "debe" in fila[3].lower():
+                    
+                    # REGLA NUEVA: El "debe 500" manual también solo cuenta hasta junio
+                    if len(fila) > 3 and "debe" in fila[3].lower() and mes_num <= 6:
                         deuda_total += 500
+                    
+                    # Sumar recargo automático y extras
                     deuda_total += recargo_automatico + extra_manual
                 
                 if nombre not in datos:
@@ -125,9 +125,7 @@ def marcar_pagado(cambio: Cambio):
     
     for i, fila in enumerate(valores, start=1):
         if fila[0].strip() == cambio.nombre:
-            # Actualizar columna B (Estado) a PAGADO
             hoja.update_cell(i, 2, "PAGADO")
-            # Actualizar columna C (Método) con efectivo o transferencia
             hoja.update_cell(i, 3, cambio.metodo)
             return {"mensaje": f"{cambio.nombre} marcado como PAGADO en {cambio.mes}"}
     
