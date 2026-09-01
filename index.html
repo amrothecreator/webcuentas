@@ -11,40 +11,10 @@
         input, button { padding: 10px; margin: 5px; }
         .admin-btn { background: green; color: white; border: none; cursor: pointer; }
 
-        /* ESTILOS DEL POP-UP (MODAL) */
-        .modal {
-            display: none; /* Oculto por defecto */
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5); /* Fondo oscuro */
-        }
-        .modal-contenido {
-            background-color: #fefefe;
-            margin: 10% auto;
-            padding: 20px;
-            border-radius: 10px;
-            width: 50%;
-            max-width: 500px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            position: relative;
-        }
-        .cerrar {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        .cerrar:hover, .cerrar:focus {
-            color: black;
-            text-decoration: none;
-            cursor: pointer;
-        }
-        /* Lista dentro del modal */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+        .modal-contenido { background-color: #fefefe; margin: 10% auto; padding: 20px; border-radius: 10px; width: 50%; max-width: 500px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); position: relative; }
+        .cerrar { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .cerrar:hover, .cerrar:focus { color: black; text-decoration: none; cursor: pointer; }
         .lista-meses { list-style: none; padding: 0; }
         .lista-meses li { padding: 10px; border-bottom: 1px solid #eee; }
     </style>
@@ -67,7 +37,6 @@
         <tbody id="cuerpo-tabla"></tbody>
     </table>
 
-    <!-- ESTRUCTURA DEL POP-UP -->
     <div id="miModal" class="modal">
         <div class="modal-contenido">
             <span class="cerrar" onclick="cerrarModal()">&times;</span>
@@ -107,7 +76,6 @@
             }
         }
 
-        // Función para abrir el modal
         function verDetalle(nombre) {
             const meses = datosGlobales[nombre];
             let html = `<h2>${nombre}</h2><ul class="lista-meses">`;
@@ -115,8 +83,6 @@
                 const estado = info.estado === 'PAGADO' ? '✅ Pagado' : '❌ Pendiente';
                 let extraHTML = info.extra > 0 ? ` (Extra $${info.extra})` : '';
                 let deudaHTML = info.deuda > 0 ? ` (Debe $${info.deuda})` : '';
-                
-                // Mostrar método si está pagado
                 let metodoHTML = info.estado === 'PAGADO' && info.metodo ? ` (${info.metodo})` : '';
 
                 html += `<li>${mes.toUpperCase()}: ${estado}${metodoHTML}${extraHTML}${deudaHTML}`;
@@ -140,7 +106,7 @@
             if (event.target == modal) modal.style.display = 'none';
         }
 
-        // Validación real de contraseña en el servidor
+        // CORRECCIÓN AQUÍ: Enviar la contraseña como objeto JSON
         async function loginAdmin() {
             const pass = prompt("Contraseña de administrador:");
             if (!pass) return;
@@ -148,15 +114,15 @@
             const respuesta = await fetch('/api/login', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(pass)
+                body: JSON.stringify({ password: pass }) 
             });
 
             if (respuesta.ok) {
                 esAdmin = true;
-                alert("Modo administrador activado. Ahora puedes marcar pagos.");
+                alert("Modo administrador activado.");
                 renderTabla();
             } else {
-                alert("Contraseña incorrecta. No tienes permisos de administrador.");
+                alert("Contraseña incorrecta.");
                 esAdmin = false;
                 renderTabla();
             }
@@ -166,7 +132,6 @@
             const pass = prompt("Confirma tu contraseña de admin para modificar:");
             if (!pass) return;
 
-            // Preguntar el método de pago
             const esTransferencia = confirm("¿El pago fue por transferencia?\n\nAceptar = Transferencia\nCancelar = Efectivo");
             const metodo = esTransferencia ? "transferencia" : "efectivo";
 
@@ -177,7 +142,7 @@
             });
 
             if (respuesta.ok) {
-                alert("¡Pago registrado en Google Sheets!");
+                alert("¡Pago registrado!");
                 cerrarModal();
                 cargarDatos();
             } else {
