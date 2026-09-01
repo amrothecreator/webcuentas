@@ -36,6 +36,14 @@ class Cambio(BaseModel):
     nombre: str
     mes: str
     password: str
+    metodo: str  # Nuevo campo para "efectivo" o "transferencia"
+
+# Validar contraseña
+@app.post("/api/login")
+def login(password: str):
+    if password != PASSWORD_ADMIN:
+        raise HTTPException(status_code=401, detail="Contraseña incorrecta")
+    return {"ok": True}
 
 # Servir el archivo index.html cuando entren a la raíz "/"
 @app.get("/")
@@ -65,6 +73,8 @@ def obtener_datos():
                 metodo = ""
                 if any("transferencia" in str(celda).lower() for celda in fila):
                     metodo = "transferencia"
+                elif any("efectivo" in str(celda).lower() for celda in fila):
+                    metodo = "efectivo"
                 
                 extra_manual = 0
                 if mes == "marzo":
@@ -109,8 +119,12 @@ def marcar_pagado(cambio: Cambio):
     
     for i, fila in enumerate(valores, start=1):
         if fila[0].strip() == cambio.nombre:
+            # Actualizar columna B (Estado) a PAGADO
             hoja.update_cell(i, 2, "PAGADO")
+            # Actualizar columna C (Método) con efectivo o transferencia
+            hoja.update_cell(i, 3, cambio.metodo)
             return {"mensaje": f"{cambio.nombre} marcado como PAGADO en {cambio.mes}"}
+    
     raise HTTPException(status_code=404, detail="Persona no encontrada")
 
 if __name__ == "__main__":
