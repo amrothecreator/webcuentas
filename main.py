@@ -39,9 +39,15 @@ class Cambio(BaseModel):
     metodo: str  # Nuevo campo para "efectivo" o "transferencia"
 
 # Validar contraseña
+from pydantic import BaseModel
+
+# Asegúrate de tener este modelo definido
+class LoginData(BaseModel):
+    password: str
+
 @app.post("/api/login")
-def login(password: str):
-    if password != PASSWORD_ADMIN:
+def login(data: LoginData):
+    if data.password != PASSWORD_ADMIN:
         raise HTTPException(status_code=401, detail="Contraseña incorrecta")
     return {"ok": True}
 
