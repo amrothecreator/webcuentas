@@ -80,7 +80,8 @@
         let datosGlobales = {};
 
         async function cargarDatos() {
-            const respuesta = await fetch('http://localhost:8000/api/datos');
+            // Aquí está el cambio: sin localhost
+            const respuesta = await fetch('/api/datos');
             datosGlobales = await respuesta.json();
             renderTabla();
         }
@@ -145,7 +146,6 @@
 
         function loginAdmin() {
             const pass = prompt("Contraseña de administrador:");
-            // (Aquí puedes validar con un endpoint o dejarlo simple)
             esAdmin = true; 
             alert("Modo administrador activado. Ahora puedes marcar pagos.");
             renderTabla();
@@ -153,7 +153,8 @@
 
         async function marcarPagado(nombre, mes) {
             const pass = prompt("Confirma tu contraseña de admin para modificar:");
-            const respuesta = await fetch('http://localhost:8000/api/marcar_pagado', {
+            // Aquí también está el cambio: sin localhost
+            const respuesta = await fetch('/api/marcar_pagado', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ nombre, mes, password: pass })
