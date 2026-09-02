@@ -10,10 +10,9 @@ from datetime import date
 
 app = FastAPI()
 
-# Permitir conexiones desde cualquier dispositivo
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-# CONFIGURACIÓN DESDE VARIABLES DE ENTORNO (Render)
+# CONFIGURACIÓN
 SHEET_ID = os.getenv("SHEET_ID")
 PASSWORD_ADMIN = os.getenv("PASSWORD_ADMIN")
 CREDENTIALS_JSON = os.getenv("GOOGLE_CREDENTIALS_JSON")
@@ -22,6 +21,8 @@ CREDENTIALS_JSON = os.getenv("GOOGLE_CREDENTIALS_JSON")
 VALOR_CUOTA = 2000 
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+
+MESES = ["marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre"]
 
 MESES_NUM = {
     "marzo": 3, "abril": 4, "mayo": 5, "junio": 6, 
@@ -56,18 +57,16 @@ def read_index():
 @app.get("/api/datos")
 def obtener_datos():
     sh = conectar()
-    meses = ["marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre"]
     mes_actual = date.today().month
     
-    # Obtener todas las pestañas disponibles del libro (sin importar mayúsculas)
     todas_las_hojas = {hoja.title.lower(): hoja for hoja in sh.worksheets()}
     
     datos = {}
-    for mes in meses:
+    for mes in MESES:
         try:
             hoja = todas_las_hojas.get(mes)
             if not hoja:
-                print(f"Error: No se encontró la pestaña para {mes}. Verifica que exista.")
+                print(f"Error: No se encontró la pestaña para {mes}.")
                 continue
                 
             valores = hoja.get_all_values()
@@ -99,20 +98,15 @@ def obtener_datos():
                 meses_pendientes = 0
 
                 if estado != "PAGADO":
-                    meses_pendientes += 1  # Este mes no está pagado
-                    
-                    # Recargo automático solo hasta junio
+                    meses_pendientes += 1
                     if mes_num < mes_actual and mes_num <= 6:
                         recargo_automatico = 500
-                    
-                    # "debe 500" escrito manualmente solo hasta junio
                     if len(fila) > 3 and "debe" in fila[3].lower() and mes_num <= 6:
                         deuda_extra += 500
                     
                 if nombre not in datos:
                     datos[nombre] = {}
                 
-                # Calcular deuda total: (meses pendientes * cuota) + recargos + extras
                 deuda_total = (meses_pendientes * VALOR_CUOTA) + recargo_automatico + deuda_extra + extra_manual
                 
                 datos[nombre][mes] = {
@@ -126,6 +120,57 @@ def obtener_datos():
             print(f"Error leyendo {mes}: {e}")
     return datos
 
+@app.get("/api/recaudacion")
+def obtener_recaudacion():
+    sh = conectar()
+    todas_las_hojas = {hoja.title.lower(): hoja for hoja in sh.worksheets()}
+    
+    recaudacion = {}
+    for mes in MESES:
+        total_transferencia = 0
+        try:
+            hoja = todas_las_hojas.get(mes)
+            if not hoja:
+                continue
+                
+            valores = hoja.get_all_values()
+            
+            # Extras manuales
+            extra_manual = 0
+            if mes == "marzo":
+                extra_manual = 500
+            elif mes == "abril":
+                extra_manual = 300 + 500  # Puede tener 300 y 500, pero si pagó, pagó ambos? 
+                # En abril, para transferencia, solo consideramos 300 base si está pagado. Los 500 son recargo.
+                # Simplificamos: si está pagado, pagó la cuota + 300 (extra) + quizás 500 si era recargo? 
+                # Mejor: sumamos VALOR_CUOTA + 300 si es abril. Para marzo, VALOR_CUOTA + 500.
+                # Como el usuario no especificó, usaremos la misma lógica: cuota + extra manual.
+                pass
+            
+            for fila in valores[1:]:
+                nombre = fila[0].strip()
+                if not nombre: continue
+                
+                # Detectar si está pagado y por transferencia
+                pagado = any("PAGADO" in str(celda).upper() for celda in fila)
+                es_transferencia = any("transferencia" in str(celda).lower() for celda in fila)
+                
+                if pagado and es_transferencia:
+                    # Sumar cuota + extra manual
+                    monto = VALOR_CUOTA
+                    if mes == "marzo":
+                        monto += 500
+                    elif mes == "abril":
+                        monto += 300  # Solo el extra fijo, no los 500 (que serían recargo)
+                    
+                    total_transferencia += monto
+                    
+            recaudacion[mes] = total_transferencia
+        except Exception as e:
+            print(f"Error calculando recaudación para {mes}: {e}")
+    
+    return {"recaudacion": recaudacion}
+
 @app.post("/api/marcar_pagado")
 def marcar_pagado(cambio: Cambio):
     if cambio.password != PASSWORD_ADMIN:
@@ -134,7 +179,6 @@ def marcar_pagado(cambio: Cambio):
     sh = conectar()
     mes = cambio.mes.lower()
     
-    # Buscar la pestaña sin importar mayúsculas
     hoja = None
     for worksheet in sh.worksheets():
         if worksheet.title.lower() == mes:
