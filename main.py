@@ -18,6 +18,9 @@ SHEET_ID = os.getenv("SHEET_ID")
 PASSWORD_ADMIN = os.getenv("PASSWORD_ADMIN")
 CREDENTIALS_JSON = os.getenv("GOOGLE_CREDENTIALS_JSON")
 
+# 🔴 CAMBIA ESTE VALOR POR EL DE TU CUOTA MENSUAL (ej: 2000, 10000, etc.)
+VALOR_CUOTA = 2000 
+
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
 MESES_NUM = {
@@ -56,10 +59,17 @@ def obtener_datos():
     meses = ["marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre"]
     mes_actual = date.today().month
     
+    # Obtener todas las pestañas disponibles del libro (sin importar mayúsculas)
+    todas_las_hojas = {hoja.title.lower(): hoja for hoja in sh.worksheets()}
+    
     datos = {}
     for mes in meses:
         try:
-            hoja = sh.worksheet(mes) 
+            hoja = todas_las_hojas.get(mes)
+            if not hoja:
+                print(f"Error: No se encontró la pestaña para {mes}. Verifica que exista.")
+                continue
+                
             valores = hoja.get_all_values()
             mes_num = MESES_NUM[mes]
             
@@ -76,7 +86,7 @@ def obtener_datos():
                 elif any("efectivo" in str(celda).lower() for celda in fila):
                     metodo = "efectivo"
                 
-                # Extras manuales de marzo y abril (no cambian)
+                # Extras manuales de marzo y abril
                 extra_manual = 0
                 if mes == "marzo":
                     extra_manual = 500 if len(fila) > 3 and "500" in fila[3] else 0
@@ -85,22 +95,25 @@ def obtener_datos():
                     extra_manual += 500 if len(fila) > 4 and "500" in fila[4] else 0
 
                 recargo_automatico = 0
-                deuda_total = 0
+                deuda_extra = 0
+                meses_pendientes = 0
 
                 if estado != "PAGADO":
-                    # REGLA NUEVA: Recargo automático SOLO si el mes es menor al actual Y es <= junio (mes 6)
+                    meses_pendientes += 1  # Este mes no está pagado
+                    
+                    # Recargo automático solo hasta junio
                     if mes_num < mes_actual and mes_num <= 6:
                         recargo_automatico = 500
                     
-                    # REGLA NUEVA: El "debe 500" manual también solo cuenta hasta junio
+                    # "debe 500" escrito manualmente solo hasta junio
                     if len(fila) > 3 and "debe" in fila[3].lower() and mes_num <= 6:
-                        deuda_total += 500
+                        deuda_extra += 500
                     
-                    # Sumar recargo automático y extras
-                    deuda_total += recargo_automatico + extra_manual
-                
                 if nombre not in datos:
                     datos[nombre] = {}
+                
+                # Calcular deuda total: (meses pendientes * cuota) + recargos + extras
+                deuda_total = (meses_pendientes * VALOR_CUOTA) + recargo_automatico + deuda_extra + extra_manual
                 
                 datos[nombre][mes] = {
                     "estado": estado or "PENDIENTE",
@@ -120,7 +133,17 @@ def marcar_pagado(cambio: Cambio):
     
     sh = conectar()
     mes = cambio.mes.lower()
-    hoja = sh.worksheet(mes) 
+    
+    # Buscar la pestaña sin importar mayúsculas
+    hoja = None
+    for worksheet in sh.worksheets():
+        if worksheet.title.lower() == mes:
+            hoja = worksheet
+            break
+    
+    if not hoja:
+        raise HTTPException(status_code=404, detail="Pestaña no encontrada")
+    
     valores = hoja.get_all_values()
     
     for i, fila in enumerate(valores, start=1):
