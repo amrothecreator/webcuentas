@@ -1,221 +1,203 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Control de Cuotas</title>
-    <style>
-        body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
-        table { width: 100%; border-collapse: collapse; background: white; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background: #333; color: white; }
-        input, button { padding: 10px; margin: 5px; }
-        .admin-btn { background: green; color: white; border: none; cursor: pointer; }
-        .metodo-btn { background: #555; color: white; border: none; padding: 5px 10px; margin-left: 5px; cursor: pointer; }
-        .metodo-btn:hover { opacity: 0.8; }
-        
-        /* Estilos para la tabla de recaudación */
-        #tabla-recaudacion {
-            margin-top: 30px;
-            display: none; /* Oculto por defecto */
-        }
-        #tabla-recaudacion h2 {
-            margin-bottom: 10px;
-        }
+import os
+import json
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+import gspread
+from google.oauth2.service_account import Credentials
+from datetime import date
 
-        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
-        .modal-contenido { background-color: #fefefe; margin: 10% auto; padding: 20px; border-radius: 10px; width: 50%; max-width: 500px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); position: relative; }
-        .cerrar { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
-        .cerrar:hover, .cerrar:focus { color: black; text-decoration: none; cursor: pointer; }
-        .lista-meses { list-style: none; padding: 0; }
-        .lista-meses li { padding: 10px; border-bottom: 1px solid #eee; }
-    </style>
-</head>
-<body>
-    <h1>Control de Cuotas (Marzo - Octubre)</h1>
-    <input type="text" id="buscador" placeholder="Buscar persona..." onkeyup="filtrar()">
-    <button onclick="loginAdmin()">Soy Admin</button>
+app = FastAPI()
+
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+# CONFIGURACIÓN
+SHEET_ID = os.getenv("SHEET_ID")
+PASSWORD_ADMIN = os.getenv("PASSWORD_ADMIN")
+CREDENTIALS_JSON = os.getenv("GOOGLE_CREDENTIALS_JSON")
+
+# 🔴 CAMBIA ESTE VALOR POR EL DE TU CUOTA MENSUAL (ej: 2000, 10000, etc.)
+VALOR_CUOTA = 2000 
+
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+
+MESES = ["marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre"]
+
+MESES_NUM = {
+    "marzo": 3, "abril": 4, "mayo": 5, "junio": 6, 
+    "julio": 7, "agosto": 8, "septiembre": 9, "octubre": 10
+}
+
+def conectar():
+    creds_dict = json.loads(CREDENTIALS_JSON)
+    creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+    client = gspread.authorize(creds)
+    return client.open_by_key(SHEET_ID)
+
+class Cambio(BaseModel):
+    nombre: str
+    mes: str
+    password: str
+    metodo: str
+
+class LoginData(BaseModel):
+    password: str
+
+@app.post("/api/login")
+def login(data: LoginData):
+    if data.password != PASSWORD_ADMIN:
+        raise HTTPException(status_code=401, detail="Contraseña incorrecta")
+    return {"ok": True}
+
+@app.get("/")
+def read_index():
+    return FileResponse("index.html")
+
+@app.get("/api/datos")
+def obtener_datos():
+    sh = conectar()
+    mes_actual = date.today().month
     
-    <table id="tabla">
-        <thead>
-            <tr>
-                <th>Nombre</th>
-                <th>Pagados</th>
-                <th>Pendientes</th>
-                <th>Deuda Total ($)</th>
-                <th>Detalle</th>
-            </tr>
-        </thead>
-        <tbody id="cuerpo-tabla"></tbody>
-    </table>
-
-    <!-- Tabla de recaudación por transferencia -->
-    <div id="tabla-recaudacion">
-        <h2>💰 Recaudado por Transferencia (Mes a Mes)</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>Mes</th>
-                    <th>Total Recaudado</th>
-                </tr>
-            </thead>
-            <tbody id="cuerpo-recaudacion"></tbody>
-        </table>
-    </div>
-
-    <div id="miModal" class="modal">
-        <div class="modal-contenido">
-            <span class="cerrar" onclick="cerrarModal()">&times;</span>
-            <div id="detalle-persona"></div>
-        </div>
-    </div>
-
-    <script>
-        let esAdmin = false;
-        let datosGlobales = {};
-
-        async function cargarDatos() {
-            const respuesta = await fetch('/api/datos');
-            datosGlobales = await respuesta.json();
-            renderTabla();
-        }
-
-        async function cargarRecaudacion() {
-            const respuesta = await fetch('/api/recaudacion');
-            const data = await respuesta.json();
-            renderTablaRecaudacion(data.recaudacion);
-        }
-
-        function renderTablaRecaudacion(recaudacion) {
-            const cuerpo = document.getElementById('cuerpo-recaudacion');
-            cuerpo.innerHTML = '';
-            for (const [mes, total] of Object.entries(recaudacion)) {
-                cuerpo.innerHTML += `
-                    <tr>
-                        <td>${mes.toUpperCase()}</td>
-                        <td>$${total}</td>
-                    </tr>
-                `;
-            }
-        }
-
-        function renderTabla() {
-            const cuerpo = document.getElementById('cuerpo-tabla');
-            cuerpo.innerHTML = '';
-            for (const [nombre, meses] of Object.entries(datosGlobales)) {
-                let pagados = 0, pendientes = 0, deuda = 0;
-                for (const [mes, info] of Object.entries(meses)) {
-                    if (info.estado === 'PAGADO') pagados++;
-                    else pendientes++;
-                    deuda += info.deuda;
-                }
-                cuerpo.innerHTML += `
-                    <tr>
-                        <td>${nombre}</td>
-                        <td>${pagados}</td>
-                        <td>${pendientes}</td>
-                        <td>$${deuda}</td>
-                        <td><button onclick="verDetalle('${nombre}')">Ver</button></td>
-                    </tr>
-                `;
-            }
-        }
-
-        function verDetalle(nombre) {
-            const meses = datosGlobales[nombre];
-            let html = `<h2>${nombre}</h2><ul class="lista-meses">`;
-            for (const [mes, info] of Object.entries(meses)) {
-                const estado = info.estado === 'PAGADO' ? '✅ Pagado' : '❌ Pendiente';
-                let extraHTML = info.extra > 0 ? ` (Extra $${info.extra})` : '';
-                let deudaHTML = info.deuda > 0 ? ` (Debe $${info.deuda})` : '';
-                let metodoHTML = info.estado === 'PAGADO' && info.metodo ? ` (${info.metodo})` : '';
-
-                html += `<li>${mes.toUpperCase()}: ${estado}${metodoHTML}${extraHTML}${deudaHTML}`;
-                if (esAdmin && info.estado !== 'PAGADO') {
-                    html += ` <button class="admin-btn" onclick="toggleMetodo('${nombre}', '${mes}')">Marcar Pagado</button>`;
-                    html += ` <div id="opciones-${nombre}-${mes}" style="display:none; margin-top:5px;">
-                                <button class="metodo-btn" onclick="marcarPagado('${nombre}', '${mes}', 'efectivo')">💵 Efectivo</button>
-                                <button class="metodo-btn" onclick="marcarPagado('${nombre}', '${mes}', 'transferencia')">🏦 Transferencia</button>
-                              </div>`;
-                }
-                html += `</li>`;
-            }
-            html += `</ul>`;
+    todas_las_hojas = {hoja.title.lower(): hoja for hoja in sh.worksheets()}
+    
+    datos = {}
+    for mes in MESES:
+        try:
+            hoja = todas_las_hojas.get(mes)
+            if not hoja:
+                print(f"Error: No se encontró la pestaña para {mes}.")
+                continue
+                
+            valores = hoja.get_all_values()
+            mes_num = MESES_NUM[mes]
             
-            document.getElementById('detalle-persona').innerHTML = html;
-            document.getElementById('miModal').style.display = 'block';
-        }
+            for fila in valores[1:]:
+                nombre = fila[0].strip()
+                if not nombre: continue
+                
+                pagado = any("PAGADO" in str(celda).upper() for celda in fila)
+                estado = "PAGADO" if pagado else ""
+                
+                metodo = ""
+                if any("transferencia" in str(celda).lower() for celda in fila):
+                    metodo = "transferencia"
+                elif any("efectivo" in str(celda).lower() for celda in fila):
+                    metodo = "efectivo"
+                
+                # Extras manuales de marzo y abril
+                extra_manual = 0
+                if mes == "marzo":
+                    extra_manual = 500 if len(fila) > 3 and "500" in fila[3] else 0
+                elif mes == "abril":
+                    extra_manual = 300 if len(fila) > 3 and "300" in fila[3] else 0
+                    extra_manual += 500 if len(fila) > 4 and "500" in fila[4] else 0
 
-        function toggleMetodo(nombre, mes) {
-            const div = document.getElementById(`opciones-${nombre}-${mes}`);
-            if (div) div.style.display = div.style.display === 'none' ? 'block' : 'none';
-        }
+                recargo_automatico = 0
+                deuda_extra = 0
+                meses_pendientes = 0
 
-        function cerrarModal() {
-            document.getElementById('miModal').style.display = 'none';
-        }
-
-        window.onclick = function(event) {
-            const modal = document.getElementById('miModal');
-            if (event.target == modal) modal.style.display = 'none';
-        }
-
-        async function loginAdmin() {
-            const pass = prompt("Contraseña de administrador:");
-            if (!pass) return;
-
-            const respuesta = await fetch('/api/login', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ password: pass }) 
-            });
-
-            if (respuesta.ok) {
-                esAdmin = true;
-                alert("Modo administrador activado.");
-                renderTabla();
-                // Mostrar y cargar la tabla de recaudación
-                document.getElementById('tabla-recaudacion').style.display = 'block';
-                await cargarRecaudacion();
-            } else {
-                alert("Contraseña incorrecta.");
-                esAdmin = false;
-                renderTabla();
-                document.getElementById('tabla-recaudacion').style.display = 'none';
-            }
-        }
-
-        async function marcarPagado(nombre, mes, metodo) {
-            const pass = prompt("Confirma tu contraseña de admin para modificar:");
-            if (!pass) return;
-
-            const respuesta = await fetch('/api/marcar_pagado', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ nombre, mes, password: pass, metodo })
-            });
-
-            if (respuesta.ok) {
-                alert("¡Pago registrado con éxito!");
-                await cargarDatos();
-                verDetalle(nombre); // Mantener el modal abierto
-                if (esAdmin) {
-                    await cargarRecaudacion(); // Actualizar la tabla de recaudación
+                if estado != "PAGADO":
+                    meses_pendientes += 1
+                    if mes_num < mes_actual and mes_num <= 6:
+                        recargo_automatico = 500
+                    if len(fila) > 3 and "debe" in fila[3].lower() and mes_num <= 6:
+                        deuda_extra += 500
+                    
+                if nombre not in datos:
+                    datos[nombre] = {}
+                
+                deuda_total = (meses_pendientes * VALOR_CUOTA) + recargo_automatico + deuda_extra + extra_manual
+                
+                datos[nombre][mes] = {
+                    "estado": estado or "PENDIENTE",
+                    "metodo": metodo,
+                    "extra": extra_manual, 
+                    "recargo_automatico": recargo_automatico, 
+                    "deuda": deuda_total 
                 }
-            } else {
-                alert("Error: Contraseña incorrecta o persona no encontrada.");
-            }
-        }
+        except Exception as e:
+            print(f"Error leyendo {mes}: {e}")
+    return datos
 
-        function filtrar() {
-            const texto = document.getElementById('buscador').value.toLowerCase();
-            const filas = document.querySelectorAll('#cuerpo-tabla tr');
-            filas.forEach(fila => {
-                const nombre = fila.cells[0].textContent.toLowerCase();
-                fila.style.display = nombre.includes(texto) ? '' : 'none';
-            });
-        }
+@app.get("/api/recaudacion")
+def obtener_recaudacion():
+    sh = conectar()
+    todas_las_hojas = {hoja.title.lower(): hoja for hoja in sh.worksheets()}
+    
+    recaudacion = {}
+    for mes in MESES:
+        total_transferencia = 0
+        try:
+            hoja = todas_las_hojas.get(mes)
+            if not hoja:
+                continue
+                
+            valores = hoja.get_all_values()
+            
+            # Extras manuales
+            extra_manual = 0
+            if mes == "marzo":
+                extra_manual = 500
+            elif mes == "abril":
+                extra_manual = 300 + 500  # Puede tener 300 y 500, pero si pagó, pagó ambos? 
+                # En abril, para transferencia, solo consideramos 300 base si está pagado. Los 500 son recargo.
+                # Simplificamos: si está pagado, pagó la cuota + 300 (extra) + quizás 500 si era recargo? 
+                # Mejor: sumamos VALOR_CUOTA + 300 si es abril. Para marzo, VALOR_CUOTA + 500.
+                # Como el usuario no especificó, usaremos la misma lógica: cuota + extra manual.
+                pass
+            
+            for fila in valores[1:]:
+                nombre = fila[0].strip()
+                if not nombre: continue
+                
+                # Detectar si está pagado y por transferencia
+                pagado = any("PAGADO" in str(celda).upper() for celda in fila)
+                es_transferencia = any("transferencia" in str(celda).lower() for celda in fila)
+                
+                if pagado and es_transferencia:
+                    # Sumar cuota + extra manual
+                    monto = VALOR_CUOTA
+                    if mes == "marzo":
+                        monto += 500
+                    elif mes == "abril":
+                        monto += 300  # Solo el extra fijo, no los 500 (que serían recargo)
+                    
+                    total_transferencia += monto
+                    
+            recaudacion[mes] = total_transferencia
+        except Exception as e:
+            print(f"Error calculando recaudación para {mes}: {e}")
+    
+    return {"recaudacion": recaudacion}
 
-        cargarDatos();
-    </script>
-</body>
-</html>
+@app.post("/api/marcar_pagado")
+def marcar_pagado(cambio: Cambio):
+    if cambio.password != PASSWORD_ADMIN:
+        raise HTTPException(status_code=401, detail="Contraseña incorrecta")
+    
+    sh = conectar()
+    mes = cambio.mes.lower()
+    
+    hoja = None
+    for worksheet in sh.worksheets():
+        if worksheet.title.lower() == mes:
+            hoja = worksheet
+            break
+    
+    if not hoja:
+        raise HTTPException(status_code=404, detail="Pestaña no encontrada")
+    
+    valores = hoja.get_all_values()
+    
+    for i, fila in enumerate(valores, start=1):
+        if fila[0].strip() == cambio.nombre:
+            hoja.update_cell(i, 2, "PAGADO")
+            hoja.update_cell(i, 3, cambio.metodo)
+            return {"mensaje": f"{cambio.nombre} marcado como PAGADO en {cambio.mes}"}
+    
+    raise HTTPException(status_code=404, detail="Persona no encontrada")
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
