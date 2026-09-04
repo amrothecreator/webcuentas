@@ -16,7 +16,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 SHEET_ID = os.getenv("SHEET_ID")
 PASSWORD_ADMIN = os.getenv("PASSWORD_ADMIN")
 CREDENTIALS_JSON = os.getenv("GOOGLE_CREDENTIALS_JSON")
-VALOR_CUOTA = 2000  # ¡Cámbialo por el valor real de tu cuota!
+VALOR_CUOTA = 2000  # 🔴 ¡Cámbialo por el valor real de tu cuota!
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
@@ -33,6 +33,12 @@ class LoginData(BaseModel):
     password: str
 
 class Cambio(BaseModel):
+    nombre: str
+    mes: str
+    password: str
+    metodo: str
+
+class PagoDeuda(BaseModel):
     nombre: str
     mes: str
     password: str
@@ -150,9 +156,9 @@ def obtener_recaudacion():
     
     return {"recaudacion": recaudacion}
 
-# NUEVO: Pagar deuda de atraso específica (ej. pagar los $500 de marzo)
+# NUEVO: Pagar deuda de atraso específica, ahora también guarda el método
 @app.post("/api/pagar_deuda")
-def pagar_deuda(data: NombreMes):
+def pagar_deuda(data: PagoDeuda):
     if data.password != PASSWORD_ADMIN:
         raise HTTPException(status_code=401, detail="Contraseña incorrecta")
     
@@ -170,10 +176,11 @@ def pagar_deuda(data: NombreMes):
     for i, fila in enumerate(valores, start=1):
         if fila[0].strip() == data.nombre:
             # Limpiar la celda de deuda según el mes
-            # Marzo: col D (4), Abril: col E (5), Mayo-Oct: col D (4)
             col_deuda = 5 if mes == "abril" else 4
             hoja.update_cell(i, col_deuda, "")  # Borrar el "debe 500" o "500"
-            return {"mensaje": f"Deuda de {data.nombre} en {data.mes} saldada."}
+            # Registrar el método de pago en la columna C
+            hoja.update_cell(i, 3, data.metodo)
+            return {"mensaje": f"Deuda de {data.nombre} en {data.mes} saldada por {data.metodo}."}
     
     raise HTTPException(status_code=404, detail="Persona no encontrada")
 
