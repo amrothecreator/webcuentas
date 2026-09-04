@@ -10,10 +10,17 @@
         th { background: #333; color: white; }
         input, button { padding: 10px; margin: 5px; }
         .admin-btn { background: green; color: white; border: none; cursor: pointer; }
-        
-        /* Estilos para los botones de pago */
         .metodo-btn { background: #555; color: white; border: none; padding: 5px 10px; margin-left: 5px; cursor: pointer; }
         .metodo-btn:hover { opacity: 0.8; }
+        
+        /* Estilos para la tabla de recaudación */
+        #tabla-recaudacion {
+            margin-top: 30px;
+            display: none; /* Oculto por defecto */
+        }
+        #tabla-recaudacion h2 {
+            margin-bottom: 10px;
+        }
 
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
         .modal-contenido { background-color: #fefefe; margin: 10% auto; padding: 20px; border-radius: 10px; width: 50%; max-width: 500px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); position: relative; }
@@ -21,7 +28,6 @@
         .cerrar:hover, .cerrar:focus { color: black; text-decoration: none; cursor: pointer; }
         .lista-meses { list-style: none; padding: 0; }
         .lista-meses li { padding: 10px; border-bottom: 1px solid #eee; }
-        .recargo { color: #d9534f; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -42,6 +48,20 @@
         <tbody id="cuerpo-tabla"></tbody>
     </table>
 
+    <!-- Tabla de recaudación por transferencia -->
+    <div id="tabla-recaudacion">
+        <h2>💰 Recaudado por Transferencia (Mes a Mes)</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Mes</th>
+                    <th>Total Recaudado</th>
+                </tr>
+            </thead>
+            <tbody id="cuerpo-recaudacion"></tbody>
+        </table>
+    </div>
+
     <div id="miModal" class="modal">
         <div class="modal-contenido">
             <span class="cerrar" onclick="cerrarModal()">&times;</span>
@@ -57,6 +77,25 @@
             const respuesta = await fetch('/api/datos');
             datosGlobales = await respuesta.json();
             renderTabla();
+        }
+
+        async function cargarRecaudacion() {
+            const respuesta = await fetch('/api/recaudacion');
+            const data = await respuesta.json();
+            renderTablaRecaudacion(data.recaudacion);
+        }
+
+        function renderTablaRecaudacion(recaudacion) {
+            const cuerpo = document.getElementById('cuerpo-recaudacion');
+            cuerpo.innerHTML = '';
+            for (const [mes, total] of Object.entries(recaudacion)) {
+                cuerpo.innerHTML += `
+                    <tr>
+                        <td>${mes.toUpperCase()}</td>
+                        <td>$${total}</td>
+                    </tr>
+                `;
+            }
         }
 
         function renderTabla() {
@@ -91,11 +130,8 @@
                 let metodoHTML = info.estado === 'PAGADO' && info.metodo ? ` (${info.metodo})` : '';
 
                 html += `<li>${mes.toUpperCase()}: ${estado}${metodoHTML}${extraHTML}${deudaHTML}`;
-                
                 if (esAdmin && info.estado !== 'PAGADO') {
-                    // Botón principal que despliega las opciones
                     html += ` <button class="admin-btn" onclick="toggleMetodo('${nombre}', '${mes}')">Marcar Pagado</button>`;
-                    // Opciones ocultas de pago
                     html += ` <div id="opciones-${nombre}-${mes}" style="display:none; margin-top:5px;">
                                 <button class="metodo-btn" onclick="marcarPagado('${nombre}', '${mes}', 'efectivo')">💵 Efectivo</button>
                                 <button class="metodo-btn" onclick="marcarPagado('${nombre}', '${mes}', 'transferencia')">🏦 Transferencia</button>
@@ -109,12 +145,9 @@
             document.getElementById('miModal').style.display = 'block';
         }
 
-        // Función para mostrar u ocultar los botones de Efectivo/Transferencia
         function toggleMetodo(nombre, mes) {
             const div = document.getElementById(`opciones-${nombre}-${mes}`);
-            if (div) {
-                div.style.display = div.style.display === 'none' ? 'block' : 'none';
-            }
+            if (div) div.style.display = div.style.display === 'none' ? 'block' : 'none';
         }
 
         function cerrarModal() {
@@ -140,14 +173,17 @@
                 esAdmin = true;
                 alert("Modo administrador activado.");
                 renderTabla();
+                // Mostrar y cargar la tabla de recaudación
+                document.getElementById('tabla-recaudacion').style.display = 'block';
+                await cargarRecaudacion();
             } else {
                 alert("Contraseña incorrecta.");
                 esAdmin = false;
                 renderTabla();
+                document.getElementById('tabla-recaudacion').style.display = 'none';
             }
         }
 
-        // Ahora recibe el método directamente
         async function marcarPagado(nombre, mes, metodo) {
             const pass = prompt("Confirma tu contraseña de admin para modificar:");
             if (!pass) return;
@@ -160,12 +196,11 @@
 
             if (respuesta.ok) {
                 alert("¡Pago registrado con éxito!");
-                
-                // 1. Actualizar los datos globales
                 await cargarDatos();
-                
-                // 2. Re-renderizar el detalle SIN cerrar el modal para que se vea actualizado al instante
-                verDetalle(nombre); 
+                verDetalle(nombre); // Mantener el modal abierto
+                if (esAdmin) {
+                    await cargarRecaudacion(); // Actualizar la tabla de recaudación
+                }
             } else {
                 alert("Error: Contraseña incorrecta o persona no encontrada.");
             }
