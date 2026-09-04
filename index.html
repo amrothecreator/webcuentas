@@ -124,18 +124,15 @@
                 html += `<li>${mes.toUpperCase()}: ${estado}${metodoHTML}${extraHTML}${deudaHTML}`;
                 
                 if (esAdmin && info.estado !== 'PAGADO') {
-                    // Botón para marcar pagado
                     html += ` <button class="admin-btn" onclick="toggleMetodo('${nombre}', '${mes}')">Marcar Pagado</button>`;
                     html += ` <div id="opciones-${nombre}-${mes}" style="display:none; margin-top:5px;">
                                 <button class="metodo-btn" onclick="marcarPagado('${nombre}', '${mes}', 'efectivo')">💵 Efectivo</button>
                                 <button class="metodo-btn" onclick="marcarPagado('${nombre}', '${mes}', 'transferencia')">🏦 Transferencia</button>
                               </div>`;
-                    // Botón para pagar deuda si existe deuda
                     if (info.deuda > 0 || info.recargo_automatico > 0) {
                         html += ` <button class="deuda-btn" onclick="pagarDeuda('${nombre}', '${mes}')">Pagar Deuda</button>`;
                     }
                 } else if (esAdmin && info.estado === 'PAGADO') {
-                    // Botón para deshacer pago
                     html += ` <button class="deshacer-btn" onclick="deshacerPago('${nombre}', '${mes}')">Deshacer Pago</button>`;
                 }
                 html += `</li>`;
@@ -186,12 +183,10 @@
             }
         }
 
-        // Pagar la deuda de atraso (500) ahora con opción de método
         async function pagarDeuda(nombre, mes) {
             const pass = prompt("Confirma tu contraseña de admin:");
             if (!pass) return;
 
-            // Preguntar el método de pago
             const esTransferencia = confirm("¿El pago de la deuda fue por transferencia?\n\nAceptar = Transferencia\nCancelar = Efectivo");
             const metodo = esTransferencia ? "transferencia" : "efectivo";
 
@@ -211,7 +206,6 @@
             }
         }
 
-        // Deshacer un pago
         async function deshacerPago(nombre, mes) {
             if (!confirm(`¿Seguro que quieres deshacer el pago de ${nombre} en ${mes}?`)) return;
             
@@ -234,7 +228,6 @@
             }
         }
 
-        // Actualizar pagos de septiembre (para todos)
         async function actualizarTodo() {
             const pass = prompt("Confirma tu contraseña de admin para la actualización masiva:");
             if (!pass) return;
@@ -252,7 +245,6 @@
             if (esAdmin) await cargarRecaudacion();
         }
 
-        // Marcar pago con método
         async function marcarPagado(nombre, mes, metodo) {
             const pass = prompt("Confirma tu contraseña de admin para modificar:");
             if (!pass) return;
