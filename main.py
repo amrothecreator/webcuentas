@@ -16,18 +16,12 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 SHEET_ID = os.getenv("SHEET_ID")
 PASSWORD_ADMIN = os.getenv("PASSWORD_ADMIN")
 CREDENTIALS_JSON = os.getenv("GOOGLE_CREDENTIALS_JSON")
-
-# 🔴 CAMBIA ESTE VALOR POR EL DE TU CUOTA MENSUAL (ej: 2000, 10000, etc.)
-VALOR_CUOTA = 2000 
+VALOR_CUOTA = 2000  # ¡Cámbialo por el valor real de tu cuota!
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
 MESES = ["marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre"]
-
-MESES_NUM = {
-    "marzo": 3, "abril": 4, "mayo": 5, "junio": 6, 
-    "julio": 7, "agosto": 8, "septiembre": 9, "octubre": 10
-}
+MESES_NUM = {"marzo": 3, "abril": 4, "mayo": 5, "junio": 6, "julio": 7, "agosto": 8, "septiembre": 9, "octubre": 10}
 
 def conectar():
     creds_dict = json.loads(CREDENTIALS_JSON)
@@ -35,13 +29,18 @@ def conectar():
     client = gspread.authorize(creds)
     return client.open_by_key(SHEET_ID)
 
+class LoginData(BaseModel):
+    password: str
+
 class Cambio(BaseModel):
     nombre: str
     mes: str
     password: str
     metodo: str
 
-class LoginData(BaseModel):
+class NombreMes(BaseModel):
+    nombre: str
+    mes: str
     password: str
 
 @app.post("/api/login")
@@ -58,16 +57,13 @@ def read_index():
 def obtener_datos():
     sh = conectar()
     mes_actual = date.today().month
-    
     todas_las_hojas = {hoja.title.lower(): hoja for hoja in sh.worksheets()}
     
     datos = {}
     for mes in MESES:
         try:
             hoja = todas_las_hojas.get(mes)
-            if not hoja:
-                print(f"Error: No se encontró la pestaña para {mes}.")
-                continue
+            if not hoja: continue
                 
             valores = hoja.get_all_values()
             mes_num = MESES_NUM[mes]
@@ -85,7 +81,6 @@ def obtener_datos():
                 elif any("efectivo" in str(celda).lower() for celda in fila):
                     metodo = "efectivo"
                 
-                # Extras manuales de marzo y abril
                 extra_manual = 0
                 if mes == "marzo":
                     extra_manual = 500 if len(fila) > 3 and "500" in fila[3] else 0
@@ -130,38 +125,22 @@ def obtener_recaudacion():
         total_transferencia = 0
         try:
             hoja = todas_las_hojas.get(mes)
-            if not hoja:
-                continue
+            if not hoja: continue
                 
             valores = hoja.get_all_values()
-            
-            # Extras manuales
-            extra_manual = 0
-            if mes == "marzo":
-                extra_manual = 500
-            elif mes == "abril":
-                extra_manual = 300 + 500  # Puede tener 300 y 500, pero si pagó, pagó ambos? 
-                # En abril, para transferencia, solo consideramos 300 base si está pagado. Los 500 son recargo.
-                # Simplificamos: si está pagado, pagó la cuota + 300 (extra) + quizás 500 si era recargo? 
-                # Mejor: sumamos VALOR_CUOTA + 300 si es abril. Para marzo, VALOR_CUOTA + 500.
-                # Como el usuario no especificó, usaremos la misma lógica: cuota + extra manual.
-                pass
-            
             for fila in valores[1:]:
                 nombre = fila[0].strip()
                 if not nombre: continue
                 
-                # Detectar si está pagado y por transferencia
                 pagado = any("PAGADO" in str(celda).upper() for celda in fila)
                 es_transferencia = any("transferencia" in str(celda).lower() for celda in fila)
                 
                 if pagado and es_transferencia:
-                    # Sumar cuota + extra manual
                     monto = VALOR_CUOTA
                     if mes == "marzo":
                         monto += 500
                     elif mes == "abril":
-                        monto += 300  # Solo el extra fijo, no los 500 (que serían recargo)
+                        monto += 300
                     
                     total_transferencia += monto
                     
@@ -171,6 +150,101 @@ def obtener_recaudacion():
     
     return {"recaudacion": recaudacion}
 
+# NUEVO: Pagar deuda de atraso específica (ej. pagar los $500 de marzo)
+@app.post("/api/pagar_deuda")
+def pagar_deuda(data: NombreMes):
+    if data.password != PASSWORD_ADMIN:
+        raise HTTPException(status_code=401, detail="Contraseña incorrecta")
+    
+    sh = conectar()
+    mes = data.mes.lower()
+    hoja = None
+    for worksheet in sh.worksheets():
+        if worksheet.title.lower() == mes:
+            hoja = worksheet
+            break
+    if not hoja:
+        raise HTTPException(status_code=404, detail="Pestaña no encontrada")
+    
+    valores = hoja.get_all_values()
+    for i, fila in enumerate(valores, start=1):
+        if fila[0].strip() == data.nombre:
+            # Limpiar la celda de deuda según el mes
+            # Marzo: col D (4), Abril: col E (5), Mayo-Oct: col D (4)
+            col_deuda = 5 if mes == "abril" else 4
+            hoja.update_cell(i, col_deuda, "")  # Borrar el "debe 500" o "500"
+            return {"mensaje": f"Deuda de {data.nombre} en {data.mes} saldada."}
+    
+    raise HTTPException(status_code=404, detail="Persona no encontrada")
+
+# NUEVO: Deshacer pago (volver a estado pendiente)
+@app.post("/api/deshacer_pago")
+def deshacer_pago(data: NombreMes):
+    if data.password != PASSWORD_ADMIN:
+        raise HTTPException(status_code=401, detail="Contraseña incorrecta")
+    
+    sh = conectar()
+    mes = data.mes.lower()
+    hoja = None
+    for worksheet in sh.worksheets():
+        if worksheet.title.lower() == mes:
+            hoja = worksheet
+            break
+    if not hoja:
+        raise HTTPException(status_code=404, detail="Pestaña no encontrada")
+    
+    valores = hoja.get_all_values()
+    for i, fila in enumerate(valores, start=1):
+        if fila[0].strip() == data.nombre:
+            # Desmarcar pago (B vacío)
+            hoja.update_cell(i, 2, "")
+            # Limpiar método de pago (C vacío)
+            hoja.update_cell(i, 3, "")
+            # Restaurar deuda si es un mes anterior a junio
+            if MESES_NUM.get(mes, 0) <= 6:
+                col_deuda = 5 if mes == "abril" else 4
+                hoja.update_cell(i, col_deuda, "debe 500")
+            return {"mensaje": f"Pago de {data.nombre} en {data.mes} deshecho."}
+    
+    raise HTTPException(status_code=404, detail="Persona no encontrada")
+
+# NUEVO: Actualizar pagos de septiembre (pagar deudas atrasadas automáticamente)
+@app.post("/api/actualizar_pagos")
+def actualizar_pagos(data: LoginData):
+    if data.password != PASSWORD_ADMIN:
+        raise HTTPException(status_code=401, detail="Contraseña incorrecta")
+    
+    # Solo ejecutar si hoy es mayor o igual al 1 de septiembre (ej. 2026-09-04)
+    hoy = date.today()
+    fecha_limite = date(2026, 9, 1)
+    
+    if hoy < fecha_limite:
+        return {"mensaje": "Aún no es 1 de septiembre."}
+    
+    sh = conectar()
+    todas_las_hojas = {hoja.title.lower(): hoja for hoja in sh.worksheets()}
+    actualizados = 0
+    
+    for mes in MESES:
+        hoja = todas_las_hojas.get(mes)
+        if not hoja: continue
+        
+        valores = hoja.get_all_values()
+        for i, fila in enumerate(valores, start=1):
+            nombre = fila[0].strip()
+            if not nombre: continue
+            
+            # Si está pagado
+            pagado = any("PAGADO" in str(celda).upper() for celda in fila)
+            if pagado:
+                # Buscar y limpiar cualquier deuda en la columna D o E
+                col_deuda = 5 if mes == "abril" else 4
+                if len(fila) > col_deuda - 1 and ("debe" in str(fila[col_deuda - 1]).lower() or "500" in str(fila[col_deuda - 1])):
+                    hoja.update_cell(i, col_deuda, "")
+                    actualizados += 1
+    
+    return {"mensaje": f"Actualización completada. {actualizados} deudas saldadas."}
+
 @app.post("/api/marcar_pagado")
 def marcar_pagado(cambio: Cambio):
     if cambio.password != PASSWORD_ADMIN:
@@ -178,18 +252,15 @@ def marcar_pagado(cambio: Cambio):
     
     sh = conectar()
     mes = cambio.mes.lower()
-    
     hoja = None
     for worksheet in sh.worksheets():
         if worksheet.title.lower() == mes:
             hoja = worksheet
             break
-    
     if not hoja:
         raise HTTPException(status_code=404, detail="Pestaña no encontrada")
     
     valores = hoja.get_all_values()
-    
     for i, fila in enumerate(valores, start=1):
         if fila[0].strip() == cambio.nombre:
             hoja.update_cell(i, 2, "PAGADO")
