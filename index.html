@@ -19,7 +19,21 @@
         #actualizar-btn { background: #007bff; color: white; border: none; cursor: pointer; }
 
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
-        .modal-contenido { background-color: #fefefe; margin: 10% auto; padding: 20px; border-radius: 10px; width: 50%; max-width: 500px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); position: relative; }
+        
+        /* MODIFICADO: Se agregó max-height y overflow-y */
+        .modal-contenido {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border-radius: 10px;
+            width: 50%;
+            max-width: 500px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            position: relative;
+            max-height: 80vh; 
+            overflow-y: auto;
+        }
+
         .cerrar { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
         .cerrar:hover, .cerrar:focus { color: black; text-decoration: none; cursor: pointer; }
         .lista-meses { list-style: none; padding: 0; }
