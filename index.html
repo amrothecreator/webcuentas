@@ -14,26 +14,16 @@
         .metodo-btn:hover { opacity: 0.8; }
         .deuda-btn { background: orange; color: white; border: none; padding: 5px 10px; margin-left: 5px; cursor: pointer; }
         .deshacer-btn { background: red; color: white; border: none; padding: 5px 10px; margin-left: 5px; cursor: pointer; }
+        .deshacer-deuda-btn { background: darkred; color: white; border: none; padding: 5px 10px; margin-left: 5px; cursor: pointer; }
         
         #tabla-recaudacion { margin-top: 30px; display: none; }
         #actualizar-btn { background: #007bff; color: white; border: none; cursor: pointer; }
 
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
-        
-        /* MODIFICADO: Se agregó max-height y overflow-y */
         .modal-contenido {
-            background-color: #fefefe;
-            margin: 5% auto;
-            padding: 20px;
-            border-radius: 10px;
-            width: 50%;
-            max-width: 500px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            position: relative;
-            max-height: 80vh; 
-            overflow-y: auto;
+            background-color: #fefefe; margin: 5% auto; padding: 20px; border-radius: 10px; width: 50%; max-width: 500px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2); position: relative; max-height: 80vh; overflow-y: auto;
         }
-
         .cerrar { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
         .cerrar:hover, .cerrar:focus { color: black; text-decoration: none; cursor: pointer; }
         .lista-meses { list-style: none; padding: 0; }
@@ -148,6 +138,10 @@
                     }
                 } else if (esAdmin && info.estado === 'PAGADO') {
                     html += ` <button class="deshacer-btn" onclick="deshacerPago('${nombre}', '${mes}')">Deshacer Pago</button>`;
+                    // Mostrar botón de deshacer deuda solo si la deuda fue pagada y el mes tiene recargo
+                    if (info.deuda_pagada && ['marzo', 'abril', 'mayo', 'junio'].includes(mes)) {
+                        html += ` <button class="deshacer-deuda-btn" onclick="deshacerPagoDeuda('${nombre}', '${mes}')">Deshacer Pago Deuda</button>`;
+                    }
                 }
                 html += `</li>`;
             }
@@ -239,6 +233,29 @@
                 if (esAdmin) await cargarRecaudacion();
             } else {
                 alert("Error al deshacer el pago.");
+            }
+        }
+
+        // Nueva función para deshacer solo la deuda
+        async function deshacerPagoDeuda(nombre, mes) {
+            if (!confirm(`¿Seguro que quieres restaurar la deuda de atraso de ${nombre} en ${mes}?`)) return;
+            
+            const pass = prompt("Confirma tu contraseña de admin:");
+            if (!pass) return;
+
+            const respuesta = await fetch('/api/deshacer_pago_deuda', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ nombre, mes, password: pass })
+            });
+
+            if (respuesta.ok) {
+                alert("Deuda de atraso restaurada.");
+                await cargarDatos();
+                verDetalle(nombre);
+                if (esAdmin) await cargarRecaudacion();
+            } else {
+                alert("Error al restaurar la deuda.");
             }
         }
 
