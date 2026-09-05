@@ -22,6 +22,7 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
 MESES = ["marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre"]
 MESES_NUM = {"marzo": 3, "abril": 4, "mayo": 5, "junio": 6, "julio": 7, "agosto": 8, "septiembre": 9, "octubre": 10}
+MESES_CON_RECARGO = ["marzo", "abril", "mayo", "junio"]
 
 def conectar():
     creds_dict = json.loads(CREDENTIALS_JSON)
@@ -87,6 +88,17 @@ def obtener_datos():
                 elif any("efectivo" in str(celda).lower() for celda in fila):
                     metodo = "efectivo"
                 
+                # Leer celda de deuda (D para todos, E para abril)
+                col_deuda = 5 if mes == "abril" else 4
+                texto_deuda = fila[col_deuda - 1].strip() if len(fila) >= col_deuda else ""
+                
+                # Determinar si la deuda de atraso existe o fue pagada
+                # Si el mes tiene recargo y está pagado, pero la celda de deuda está vacía -> deuda pagada
+                deuda_pagada = False
+                if mes in MESES_CON_RECARGO and estado == "PAGADO":
+                    if texto_deuda == "" or "pagado" in texto_deuda.lower():
+                        deuda_pagada = True
+                
                 extra_manual = 0
                 if mes == "marzo":
                     extra_manual = 500 if len(fila) > 3 and "500" in fila[3] else 0
@@ -102,9 +114,10 @@ def obtener_datos():
                     meses_pendientes += 1
                     if mes_num < mes_actual and mes_num <= 6:
                         recargo_automatico = 500
-                    if len(fila) > 3 and "debe" in fila[3].lower() and mes_num <= 6:
-                        deuda_extra += 500
-                    
+                    # Si la celda de deuda dice "debe", contar como deuda extra
+                    if "debe" in texto_deuda.lower():
+                        deuda_extra = 500
+                
                 if nombre not in datos:
                     datos[nombre] = {}
                 
@@ -115,7 +128,8 @@ def obtener_datos():
                     "metodo": metodo,
                     "extra": extra_manual, 
                     "recargo_automatico": recargo_automatico, 
-                    "deuda": deuda_total 
+                    "deuda": deuda_total,
+                    "deuda_pagada": deuda_pagada 
                 }
         except Exception as e:
             print(f"Error leyendo {mes}: {e}")
@@ -174,11 +188,9 @@ def pagar_deuda(data: PagoDeuda):
     valores = hoja.get_all_values()
     for i, fila in enumerate(valores, start=1):
         if fila[0].strip() == data.nombre:
-            # Limpiar la celda de deuda según el mes
             col_deuda = 5 if mes == "abril" else 4
-            hoja.update_cell(i, col_deuda, "")  # Borrar el "debe 500" o "500"
-            # Registrar el método de pago en la columna C
-            hoja.update_cell(i, 3, data.metodo)
+            hoja.update_cell(i, col_deuda, "")  # Borrar la deuda
+            hoja.update_cell(i, 3, data.metodo)  # Guardar método
             return {"mensaje": f"Deuda de {data.nombre} en {data.mes} saldada por {data.metodo}."}
     
     raise HTTPException(status_code=404, detail="Persona no encontrada")
@@ -201,15 +213,42 @@ def deshacer_pago(data: NombreMes):
     valores = hoja.get_all_values()
     for i, fila in enumerate(valores, start=1):
         if fila[0].strip() == data.nombre:
-            # Desmarcar pago (B vacío)
-            hoja.update_cell(i, 2, "")
-            # Limpiar método de pago (C vacío)
-            hoja.update_cell(i, 3, "")
-            # Restaurar deuda si es un mes anterior a junio
+            hoja.update_cell(i, 2, "")  # Desmarcar pago
+            hoja.update_cell(i, 3, "")  # Limpiar método
+            # Restaurar deuda solo si es un mes con recargo
             if MESES_NUM.get(mes, 0) <= 6:
                 col_deuda = 5 if mes == "abril" else 4
                 hoja.update_cell(i, col_deuda, "debe 500")
             return {"mensaje": f"Pago de {data.nombre} en {data.mes} deshecho."}
+    
+    raise HTTPException(status_code=404, detail="Persona no encontrada")
+
+# NUEVO: Deshacer solo la deuda de atraso (dejar el mes como pagado)
+@app.post("/api/deshacer_pago_deuda")
+def deshacer_pago_deuda(data: NombreMes):
+    if data.password != PASSWORD_ADMIN:
+        raise HTTPException(status_code=401, detail="Contraseña incorrecta")
+    
+    sh = conectar()
+    mes = data.mes.lower()
+    hoja = None
+    for worksheet in sh.worksheets():
+        if worksheet.title.lower() == mes:
+            hoja = worksheet
+            break
+    if not hoja:
+        raise HTTPException(status_code=404, detail="Pestaña no encontrada")
+    
+    valores = hoja.get_all_values()
+    for i, fila in enumerate(valores, start=1):
+        if fila[0].strip() == data.nombre:
+            # Solo si el mes tiene recargo
+            if mes in MESES_CON_RECARGO:
+                col_deuda = 5 if mes == "abril" else 4
+                hoja.update_cell(i, col_deuda, "debe 500")  # Restaurar deuda
+                return {"mensaje": f"Deuda de atraso de {data.nombre} en {data.mes} restaurada."}
+            else:
+                return {"mensaje": f"El mes {data.mes} no tiene deuda de atraso."}
     
     raise HTTPException(status_code=404, detail="Persona no encontrada")
 
@@ -226,16 +265,14 @@ def actualizar_pagos(data: LoginData):
     sh = conectar()
     todas_las_hojas = {hoja.title.lower(): hoja for hoja in sh.worksheets()}
     
-    # Leer la hoja de respaldo
     if "respaldo_septiembre" not in todas_las_hojas:
         return {"mensaje": "Error: No existe la hoja 'respaldo_septiembre'."}
     
     hoja_respaldo = todas_las_hojas["respaldo_septiembre"]
     respaldo_valores = hoja_respaldo.get_all_values()
     
-    # Crear diccionario de respaldo: {(mes, nombre): estado_antes}
     respaldo = {}
-    for fila in respaldo_valores[1:]:  # Saltar encabezado
+    for fila in respaldo_valores[1:]:
         if len(fila) < 3: continue
         mes = fila[0].strip().lower()
         nombre = fila[1].strip()
@@ -243,11 +280,7 @@ def actualizar_pagos(data: LoginData):
         respaldo[(mes, nombre)] = estado_antes
     
     actualizados = 0
-    
-    # Solo trabajamos con los meses que tienen recargo
-    meses_con_recargo = ["marzo", "abril", "mayo", "junio"]
-    
-    for mes in meses_con_recargo:
+    for mes in MESES_CON_RECARGO:
         hoja = todas_las_hojas.get(mes)
         if not hoja: continue
         
@@ -260,30 +293,19 @@ def actualizar_pagos(data: LoginData):
             
             estado_actual = fila[1].strip().upper() if len(fila) > 1 else ""
             deuda_celda = fila[col_deuda - 1].strip() if len(fila) >= col_deuda else ""
-            
-            # Obtener estado antes de septiembre
             estado_antes = respaldo.get((mes, nombre), "")
             
-            # Si la celda de deuda ya tiene algo, no hacer nada
             if deuda_celda != "":
                 continue
             
-            # Lógica principal
             if estado_actual == "PAGADO":
-                # Si estaba pagado antes, no hacemos nada (ya pagó todo antes)
-                if estado_antes == "PAGADO":
-                    continue
-                # Si NO estaba pagado antes, entonces pagó después -> "500 pagado"
-                else:
+                if estado_antes != "PAGADO":
                     hoja.update_cell(i, col_deuda, "500 pagado")
                     actualizados += 1
-                    
             elif estado_actual == "":
-                # Si sigue sin pagar (y no estaba pagado antes tampoco) -> "500 pendiente"
                 if estado_antes != "PAGADO":
                     hoja.update_cell(i, col_deuda, "500 pendiente")
                     actualizados += 1
-                # Si estaba pagado antes y ahora no, es un error, pero no hacemos nada.
     
     return {"mensaje": f"Actualización completada. {actualizados} recargos actualizados correctamente."}
 
