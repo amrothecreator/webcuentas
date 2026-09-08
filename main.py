@@ -40,6 +40,7 @@ class Cambio(BaseModel):
     mes: str
     password: str
     metodo: str
+    pagar_deuda: bool = False  # Nuevo campo para separar el pago de la deuda
 
 class LoginData(BaseModel):
     password: str
@@ -85,7 +86,7 @@ def obtener_datos():
                 elif any("efectivo" in str(celda).lower() for celda in fila):
                     metodo = "efectivo"
                 
-                # Extras manuales de marzo y abril
+                # Extras manuales (300 o 500) de marzo y abril
                 extra_manual = 0
                 if mes == "marzo":
                     extra_manual = 500 if len(fila) > 3 and "500" in fila[3] else 0
@@ -93,26 +94,33 @@ def obtener_datos():
                     extra_manual = 300 if len(fila) > 3 and "300" in fila[3] else 0
                     extra_manual += 500 if len(fila) > 4 and "500" in fila[4] else 0
 
-                recargo_automatico = 0
+                # Leer la deuda de atraso (SOLO si sigue diciendo "debe 500" en columna D)
                 deuda_extra = 0
+                if len(fila) > 3 and "debe" in fila[3].lower() and mes_num <= 6:
+                    deuda_extra = 500
+                
+                recargo_automatico = 0
                 meses_pendientes = 0
 
+                # Lógica separada de la deuda y el mes
                 if estado != "PAGADO":
                     meses_pendientes += 1
                     if mes_num < mes_actual and mes_num <= 6:
                         recargo_automatico = 500
-                    if len(fila) > 3 and "debe" in fila[3].lower() and mes_num <= 6:
-                        deuda_extra += 500
-                    
+                
+                # LA DEUDA TOTAL: 
+                # - Si el mes NO está pagado, se suman cuotas + recargos + deuda extra.
+                # - Si el mes SÍ está pagado, SOLO se suma la deuda extra si sigue existiendo ("debe 500").
+                deuda_total = (meses_pendientes * VALOR_CUOTA) + recargo_automatico + deuda_extra + extra_manual
+                
                 if nombre not in datos:
                     datos[nombre] = {}
-                
-                deuda_total = (meses_pendientes * VALOR_CUOTA) + recargo_automatico + deuda_extra + extra_manual
                 
                 datos[nombre][mes] = {
                     "estado": estado or "PENDIENTE",
                     "metodo": metodo,
                     "extra": extra_manual, 
+                    "deuda_extra": deuda_extra,
                     "recargo_automatico": recargo_automatico, 
                     "deuda": deuda_total 
                 }
@@ -124,41 +132,35 @@ def obtener_datos():
 def obtener_recaudacion():
     sh = conectar()
     todas_las_hojas = {hoja.title.lower(): hoja for hoja in sh.worksheets()}
-    
     recaudacion = {}
+    
     for mes in MESES:
         total_transferencia = 0
         try:
             hoja = todas_las_hojas.get(mes)
             if not hoja:
                 continue
-                
             valores = hoja.get_all_values()
             
             for fila in valores[1:]:
                 nombre = fila[0].strip()
                 if not nombre: continue
                 
-                # Detectar si está pagado y por transferencia
                 es_pagado = any("PAGADO" in str(celda).upper() for celda in fila)
                 es_transferencia = any("transferencia" in str(celda).lower() for celda in fila)
                 
                 if es_pagado and es_transferencia:
-                    # Sumar cuota base
                     monto = VALOR_CUOTA
                     
-                    # Extras fijos y recargos por mes
                     if mes == "marzo":
-                        # Marzo tiene un extra fijo de 500 en la columna D
                         monto += 500
                     elif mes == "abril":
-                        # Abril tiene extra fijo de 300 (columna D) y posible recargo de 500 (columna E)
                         monto += 300
                         if len(fila) > 4 and "500" in fila[4]:
                             monto += 500
-                    else:  # Mayo a Octubre
-                        # Si hay "debe 500" o "500" en la columna D, y fue pagado por transferencia, sumar 500
-                        if len(fila) > 3 and ("500" in fila[3] or "debe" in fila[3].lower()):
+                    else: 
+                        # Si fue pagado por transferencia Y la columna D NO dice "debe", significa que pagó la deuda
+                        if len(fila) > 3 and "debe" not in fila[3].lower():
                             monto += 500
                     
                     total_transferencia += monto
@@ -166,7 +168,6 @@ def obtener_recaudacion():
             recaudacion[mes] = total_transferencia
         except Exception as e:
             print(f"Error calculando recaudación para {mes}: {e}")
-    
     return {"recaudacion": recaudacion}
 
 @app.post("/api/marcar_pagado")
@@ -176,7 +177,6 @@ def marcar_pagado(cambio: Cambio):
     
     sh = conectar()
     mes = cambio.mes.lower()
-    
     hoja = None
     for worksheet in sh.worksheets():
         if worksheet.title.lower() == mes:
@@ -190,9 +190,15 @@ def marcar_pagado(cambio: Cambio):
     
     for i, fila in enumerate(valores, start=1):
         if fila[0].strip() == cambio.nombre:
+            # 1. SIEMPRE marcar el mes como pagado y método
             hoja.update_cell(i, 2, "PAGADO")
             hoja.update_cell(i, 3, cambio.metodo)
-            return {"mensaje": f"{cambio.nombre} marcado como PAGADO en {cambio.mes}"}
+            
+            # 2. SOLO si se quiere pagar la deuda, se limpia la columna D
+            if cambio.pagar_deuda:
+                hoja.update_cell(i, 4, "")
+                
+            return {"mensaje": f"{cambio.nombre} actualizado en {cambio.mes}"}
     
     raise HTTPException(status_code=404, detail="Persona no encontrada")
 
