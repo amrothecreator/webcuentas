@@ -10,22 +10,11 @@
         th { background: #333; color: white; }
         input, button { padding: 10px; margin: 5px; }
         .admin-btn { background: green; color: white; border: none; cursor: pointer; }
+        .deuda-btn { background: #d9534f; color: white; border: none; cursor: pointer; }
         .metodo-btn { background: #555; color: white; border: none; padding: 5px 10px; margin-left: 5px; cursor: pointer; }
-        .metodo-btn:hover { opacity: 0.8; }
-        .deuda-btn { background: orange; color: white; border: none; padding: 5px 10px; margin-left: 5px; cursor: pointer; }
-        .deshacer-btn { background: red; color: white; border: none; padding: 5px 10px; margin-left: 5px; cursor: pointer; }
-        .deshacer-deuda-btn { background: darkred; color: white; border: none; padding: 5px 10px; margin-left: 5px; cursor: pointer; }
-        
-        #tabla-recaudacion { margin-top: 30px; display: none; }
-        #actualizar-btn { background: #007bff; color: white; border: none; cursor: pointer; }
-
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
-        .modal-contenido {
-            background-color: #fefefe; margin: 5% auto; padding: 20px; border-radius: 10px; width: 50%; max-width: 500px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2); position: relative; max-height: 80vh; overflow-y: auto;
-        }
+        .modal-contenido { background-color: #fefefe; margin: 10% auto; padding: 20px; border-radius: 10px; width: 50%; max-width: 600px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); position: relative; }
         .cerrar { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
-        .cerrar:hover, .cerrar:focus { color: black; text-decoration: none; cursor: pointer; }
         .lista-meses { list-style: none; padding: 0; }
         .lista-meses li { padding: 10px; border-bottom: 1px solid #eee; }
     </style>
@@ -33,9 +22,7 @@
 <body>
     <h1>Control de Cuotas (Marzo - Octubre)</h1>
     <input type="text" id="buscador" placeholder="Buscar persona..." onkeyup="filtrar()">
-    
     <button onclick="loginAdmin()">Soy Admin</button>
-    <button id="actualizar-btn" style="display:none;" onclick="actualizarTodo()">🔄 Actualizar Pagos Septiembre</button>
     
     <table id="tabla">
         <thead>
@@ -50,15 +37,10 @@
         <tbody id="cuerpo-tabla"></tbody>
     </table>
 
-    <div id="tabla-recaudacion">
-        <h2>💰 Recaudado por Transferencia (Mes a Mes)</h2>
+    <div id="tabla-recaudacion" style="display:none; margin-top:30px;">
+        <h2>💰 Recaudado por Transferencia</h2>
         <table>
-            <thead>
-                <tr>
-                    <th>Mes</th>
-                    <th>Total Recaudado</th>
-                </tr>
-            </thead>
+            <thead><tr><th>Mes</th><th>Total</th></tr></thead>
             <tbody id="cuerpo-recaudacion"></tbody>
         </table>
     </div>
@@ -122,25 +104,21 @@
             for (const [mes, info] of Object.entries(meses)) {
                 const estado = info.estado === 'PAGADO' ? '✅ Pagado' : '❌ Pendiente';
                 let extraHTML = info.extra > 0 ? ` (Extra $${info.extra})` : '';
-                let deudaHTML = info.deuda > 0 ? ` (Debe $${info.deuda})` : '';
+                let deudaHTML = info.deuda_extra > 0 ? ` <span style="color:#d9534f">(Debe $${info.deuda_extra})</span>` : '';
                 let metodoHTML = info.estado === 'PAGADO' && info.metodo ? ` (${info.metodo})` : '';
 
                 html += `<li>${mes.toUpperCase()}: ${estado}${metodoHTML}${extraHTML}${deudaHTML}`;
                 
-                if (esAdmin && info.estado !== 'PAGADO') {
-                    html += ` <button class="admin-btn" onclick="toggleMetodo('${nombre}', '${mes}')">Marcar Pagado</button>`;
-                    html += ` <div id="opciones-${nombre}-${mes}" style="display:none; margin-top:5px;">
-                                <button class="metodo-btn" onclick="marcarPagado('${nombre}', '${mes}', 'efectivo')">💵 Efectivo</button>
-                                <button class="metodo-btn" onclick="marcarPagado('${nombre}', '${mes}', 'transferencia')">🏦 Transferencia</button>
-                              </div>`;
-                    if (info.deuda > 0 || info.recargo_automatico > 0) {
-                        html += ` <button class="deuda-btn" onclick="pagarDeuda('${nombre}', '${mes}')">Pagar Deuda</button>`;
+                if (esAdmin) {
+                    if (info.estado !== 'PAGADO') {
+                        html += ` <button class="admin-btn" onclick="toggleMetodo('${nombre}', '${mes}')">Pagar Mes</button>`;
+                        html += ` <div id="opciones-${nombre}-${mes}" style="display:none; margin-top:5px;">
+                                    <button class="metodo-btn" onclick="marcarPagado('${nombre}', '${mes}', 'efectivo', false)">💵 Efectivo</button>
+                                    <button class="metodo-btn" onclick="marcarPagado('${nombre}', '${mes}', 'transferencia', false)">🏦 Transf.</button>
+                                  </div>`;
                     }
-                } else if (esAdmin && info.estado === 'PAGADO') {
-                    html += ` <button class="deshacer-btn" onclick="deshacerPago('${nombre}', '${mes}')">Deshacer Pago</button>`;
-                    // Mostrar botón de deshacer deuda solo si la deuda fue pagada y el mes tiene recargo
-                    if (info.deuda_pagada && ['marzo', 'abril', 'mayo', 'junio'].includes(mes)) {
-                        html += ` <button class="deshacer-deuda-btn" onclick="deshacerPagoDeuda('${nombre}', '${mes}')">Deshacer Pago Deuda</button>`;
+                    if (info.deuda_extra > 0) {
+                        html += ` <button class="deuda-btn" onclick="pagarDeuda('${nombre}', '${mes}', '${info.metodo || 'efectivo'}')">Pagar Deuda $500</button>`;
                     }
                 }
                 html += `</li>`;
@@ -156,10 +134,30 @@
             if (div) div.style.display = div.style.display === 'none' ? 'block' : 'none';
         }
 
-        function cerrarModal() {
-            document.getElementById('miModal').style.display = 'none';
+        async function marcarPagado(nombre, mes, metodo, pagarDeuda) {
+            const pass = prompt("Confirma contraseña de admin:");
+            if (!pass) return;
+
+            const respuesta = await fetch('/api/marcar_pagado', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ nombre, mes, password: pass, metodo, pagar_deuda: pagarDeuda })
+            });
+
+            if (respuesta.ok) {
+                await cargarDatos();
+                verDetalle(nombre);
+                if (esAdmin) await cargarRecaudacion();
+            } else {
+                alert("Error: Contraseña incorrecta.");
+            }
         }
 
+        async function pagarDeuda(nombre, mes, metodo) {
+            await marcarPagado(nombre, mes, metodo, true);
+        }
+
+        function cerrarModal() { document.getElementById('miModal').style.display = 'none'; }
         window.onclick = function(event) {
             const modal = document.getElementById('miModal');
             if (event.target == modal) modal.style.display = 'none';
@@ -168,16 +166,13 @@
         async function loginAdmin() {
             const pass = prompt("Contraseña de administrador:");
             if (!pass) return;
-
             const respuesta = await fetch('/api/login', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ password: pass }) 
             });
-
             if (respuesta.ok) {
                 esAdmin = true;
-                document.getElementById('actualizar-btn').style.display = 'inline-block';
                 alert("Modo administrador activado.");
                 renderTabla();
                 document.getElementById('tabla-recaudacion').style.display = 'block';
@@ -185,114 +180,8 @@
             } else {
                 alert("Contraseña incorrecta.");
                 esAdmin = false;
-                document.getElementById('actualizar-btn').style.display = 'none';
                 renderTabla();
                 document.getElementById('tabla-recaudacion').style.display = 'none';
-            }
-        }
-
-        async function pagarDeuda(nombre, mes) {
-            const pass = prompt("Confirma tu contraseña de admin:");
-            if (!pass) return;
-
-            const esTransferencia = confirm("¿El pago de la deuda fue por transferencia?\n\nAceptar = Transferencia\nCancelar = Efectivo");
-            const metodo = esTransferencia ? "transferencia" : "efectivo";
-
-            const respuesta = await fetch('/api/pagar_deuda', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ nombre, mes, password: pass, metodo })
-            });
-
-            if (respuesta.ok) {
-                alert("Deuda saldada correctamente.");
-                await cargarDatos();
-                verDetalle(nombre);
-                if (esAdmin) await cargarRecaudacion();
-            } else {
-                alert("Error al pagar deuda.");
-            }
-        }
-
-        async function deshacerPago(nombre, mes) {
-            if (!confirm(`¿Seguro que quieres deshacer el pago de ${nombre} en ${mes}?`)) return;
-            
-            const pass = prompt("Confirma tu contraseña de admin:");
-            if (!pass) return;
-
-            const respuesta = await fetch('/api/deshacer_pago', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ nombre, mes, password: pass })
-            });
-
-            if (respuesta.ok) {
-                alert("Pago deshecho.");
-                await cargarDatos();
-                verDetalle(nombre);
-                if (esAdmin) await cargarRecaudacion();
-            } else {
-                alert("Error al deshacer el pago.");
-            }
-        }
-
-        // Nueva función para deshacer solo la deuda
-        async function deshacerPagoDeuda(nombre, mes) {
-            if (!confirm(`¿Seguro que quieres restaurar la deuda de atraso de ${nombre} en ${mes}?`)) return;
-            
-            const pass = prompt("Confirma tu contraseña de admin:");
-            if (!pass) return;
-
-            const respuesta = await fetch('/api/deshacer_pago_deuda', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ nombre, mes, password: pass })
-            });
-
-            if (respuesta.ok) {
-                alert("Deuda de atraso restaurada.");
-                await cargarDatos();
-                verDetalle(nombre);
-                if (esAdmin) await cargarRecaudacion();
-            } else {
-                alert("Error al restaurar la deuda.");
-            }
-        }
-
-        async function actualizarTodo() {
-            const pass = prompt("Confirma tu contraseña de admin para la actualización masiva:");
-            if (!pass) return;
-
-            const respuesta = await fetch('/api/actualizar_pagos', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ password: pass })
-            });
-
-            const data = await respuesta.json();
-            alert(data.mensaje);
-            
-            await cargarDatos();
-            if (esAdmin) await cargarRecaudacion();
-        }
-
-        async function marcarPagado(nombre, mes, metodo) {
-            const pass = prompt("Confirma tu contraseña de admin para modificar:");
-            if (!pass) return;
-
-            const respuesta = await fetch('/api/marcar_pagado', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ nombre, mes, password: pass, metodo })
-            });
-
-            if (respuesta.ok) {
-                alert("¡Pago registrado con éxito!");
-                await cargarDatos();
-                verDetalle(nombre);
-                if (esAdmin) await cargarRecaudacion();
-            } else {
-                alert("Error: Contraseña incorrecta o persona no encontrada.");
             }
         }
 
