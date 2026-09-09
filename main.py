@@ -18,7 +18,7 @@ PASSWORD_ADMIN = os.getenv("PASSWORD_ADMIN")
 CREDENTIALS_JSON = os.getenv("GOOGLE_CREDENTIALS_JSON")
 
 # 🔴 CAMBIA ESTE VALOR POR EL DE TU CUOTA MENSUAL (ej: 2000, 2500, 10000, etc.)
-VALOR_CUOTA = 2500 
+VALOR_CUOTA = 2000
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
