@@ -17,8 +17,8 @@ SHEET_ID = os.getenv("SHEET_ID")
 PASSWORD_ADMIN = os.getenv("PASSWORD_ADMIN")
 CREDENTIALS_JSON = os.getenv("GOOGLE_CREDENTIALS_JSON")
 
-# 🔴 CAMBIA ESTE VALOR POR EL DE TU CUOTA MENSUAL (ej: 2000, 2500, 10000, etc.)
-VALOR_CUOTA = 2500 
+# VALOR DE LA CUOTA FIJO
+VALOR_CUOTA = 2000
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
@@ -85,41 +85,45 @@ def obtener_datos():
                 if len(fila) > 2:
                     metodo = fila[2].strip().lower()
                 
-                # Extras manuales (300 en abril, etc.)
-                extra_manual = 0
-                if mes == "abril" and len(fila) > 3 and "300" in fila[3]:
-                    extra_manual = 300
-                
-                # Determinar la columna del recargo (500) según el mes
+                # Lógica para deuda y extras
+                # Columna D y E según mes
                 if mes == "marzo":
                     col_recargo = fila[3].strip().lower() if len(fila) > 3 else ""
                 elif mes == "abril":
-                    col_recargo = fila[4].strip().lower() if len(fila) > 4 else ""
+                    col_d = fila[3].strip().lower() if len(fila) > 3 else ""
+                    col_e = fila[4].strip().lower() if len(fila) > 4 else ""
+                    # En abril, la deuda está solo en la E
+                    col_recargo = col_e
                 else:
                     col_recargo = fila[3].strip().lower() if len(fila) > 3 else ""
                 
-                # 🔴 LÓGICA CORRECTA PARA CALCULAR DEUDA
-                deuda_total = 0
-                recargo_automatico = 0
+                # Detectar deuda de 500 pendiente (solo si dice "debe")
                 deuda_extra = 0
+                if "debe" in col_recargo:
+                    deuda_extra = 500
                 
+                # Extras manuales: solo en abril, si es un pago claro
+                extra_manual = 0
+                if mes == "abril":
+                    # Solo sumar a la deuda si está pendiente el mes
+                    # El 300 listo ya fue pagado, no es deuda, solo lo sumamos si el mes está pendiente? No, no es deuda.
+                    # En el cálculo de deuda solo contamos cuota pendiente + deuda extra.
+                    # El 300 listo no es deuda porque ya se pagó.
+                    pass
+                
+                # Recargo automático
+                recargo_automatico = 0
+                meses_pendientes = 0
                 if estado != "PAGADO":
-                    # Debe la cuota del mes
-                    deuda_total += VALOR_CUOTA
-                    
-                    # Debe el recargo si el mes es <= junio y ya pasó
-                    if mes_num <= 6 and mes_num < mes_actual:
+                    meses_pendientes += 1
+                    if mes_num < mes_actual and mes_num <= 6:
                         recargo_automatico = 500
-                        deuda_total += 500
-                    
-                    # Sumar extras manuales (300 de abril)
-                    deuda_total += extra_manual
-                    
+                
+                # Cálculo de la deuda total
+                if estado != "PAGADO":
+                    deuda_total = (meses_pendientes * VALOR_CUOTA) + recargo_automatico + deuda_extra
                 else:
-                    # Mes pagado, revisar si dejó deuda de 500
-                    if "debe" in col_recargo:
-                        deuda_extra = 500
-                        deuda_total += 500
+                    deuda_total = deuda_extra  # Solo lo que quedó pendiente
                 
                 if nombre not in datos:
                     datos[nombre] = {}
@@ -162,22 +166,30 @@ def obtener_recaudacion():
                 if es_pagado and es_transferencia:
                     monto = VALOR_CUOTA
                     
-                    # Extra fijo de abril (300)
-                    if mes == "abril" and len(fila) > 3 and "300" in fila[3]:
-                        monto += 300
-                    
-                    # Determinar columna del recargo
-                    if mes == "marzo":
-                        col_recargo = fila[3].strip().lower() if len(fila) > 3 else ""
-                    elif mes == "abril":
-                        col_recargo = fila[4].strip().lower() if len(fila) > 4 else ""
-                    else:
-                        col_recargo = fila[3].strip().lower() if len(fila) > 3 else ""
-                    
-                    # 🔴 SOLO SUMAR RECARGO DE 500 EN MESES <= JUNIO
-                    if mes_num <= 6:
-                        if col_recargo and "debe" not in col_recargo and "500" in col_recargo:
+                    # ABRIL: condicion estricta
+                    if mes == "abril":
+                        col_d = fila[3].strip().lower() if len(fila) > 3 else ""
+                        col_e = fila[4].strip().lower() if len(fila) > 4 else ""
+                        
+                        # Sumar 300 solo si dice exactamente "300 listo"
+                        if "300 listo" in col_d:
+                            monto += 300
+                        # Sumar 500 solo si dice exactamente "500 pagado"
+                        if "500 pagado" in col_e:
                             monto += 500
+                    
+                    # MARZO: recargo 500 solo si dice "500" y no "debe"
+                    elif mes == "marzo":
+                        col_d = fila[3].strip().lower() if len(fila) > 3 else ""
+                        if "500" in col_d and "debe" not in col_d:
+                            monto += 500
+                    
+                    # MAYO A OCTUBRE (solo hasta junio para recargo)
+                    else:
+                        col_d = fila[3].strip().lower() if len(fila) > 3 else ""
+                        if mes_num <= 6:
+                            if "500" in col_d and "debe" not in col_d:
+                                monto += 500
                     
                     total_transferencia += monto
                     
