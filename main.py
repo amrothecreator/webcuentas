@@ -18,7 +18,7 @@ PASSWORD_ADMIN = os.getenv("PASSWORD_ADMIN")
 CREDENTIALS_JSON = os.getenv("GOOGLE_CREDENTIALS_JSON")
 
 # 🔴 CAMBIA ESTE VALOR POR EL DE TU CUOTA MENSUAL (ej: 2000, 2500, 10000, etc.)
-VALOR_CUOTA = 2000
+VALOR_CUOTA = 2000 
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
@@ -80,37 +80,46 @@ def obtener_datos():
                 pagado = any("PAGADO" in str(celda).upper() for celda in fila)
                 estado = "PAGADO" if pagado else ""
                 
-                # Leer método SOLO de la columna C (índice 2)
+                # Leer método SOLO de la columna C
                 metodo = ""
                 if len(fila) > 2:
                     metodo = fila[2].strip().lower()
                 
-                # Extras manuales de marzo y abril
+                # Extras manuales (300 en abril, etc.)
                 extra_manual = 0
+                if mes == "abril" and len(fila) > 3 and "300" in fila[3]:
+                    extra_manual = 300
+                
+                # Determinar la columna del recargo (500) según el mes
                 if mes == "marzo":
-                    extra_manual = 500 if len(fila) > 3 and "500" in fila[3] else 0
+                    col_recargo = fila[3].strip().lower() if len(fila) > 3 else ""
                 elif mes == "abril":
-                    extra_manual = 300 if len(fila) > 3 and "300" in fila[3] else 0
-                    extra_manual += 500 if len(fila) > 4 and "500" in fila[4] else 0
-
-                # Detectar deuda de 500 pendiente (sin importar si el mes está pagado)
-                deuda_extra = 0
-                col_deuda = fila[3].strip().lower() if len(fila) > 3 else ""
-                if "debe" in col_deuda:
-                    deuda_extra = 500
-
-                recargo_automatico = 0
-                meses_pendientes = 0
-                if estado != "PAGADO":
-                    meses_pendientes += 1
-                    if mes_num < mes_actual and mes_num <= 6:
-                        recargo_automatico = 500
-
-                # Cálculo de la deuda total
-                if estado != "PAGADO":
-                    deuda_total = (meses_pendientes * VALOR_CUOTA) + recargo_automatico + deuda_extra + extra_manual
+                    col_recargo = fila[4].strip().lower() if len(fila) > 4 else ""
                 else:
-                    deuda_total = deuda_extra  # Solo lo que quedó pendiente
+                    col_recargo = fila[3].strip().lower() if len(fila) > 3 else ""
+                
+                # 🔴 LÓGICA CORRECTA PARA CALCULAR DEUDA
+                deuda_total = 0
+                recargo_automatico = 0
+                deuda_extra = 0
+                
+                if estado != "PAGADO":
+                    # Debe la cuota del mes
+                    deuda_total += VALOR_CUOTA
+                    
+                    # Debe el recargo si el mes es <= junio y ya pasó
+                    if mes_num <= 6 and mes_num < mes_actual:
+                        recargo_automatico = 500
+                        deuda_total += 500
+                    
+                    # Sumar extras manuales (300 de abril)
+                    deuda_total += extra_manual
+                    
+                else:
+                    # Mes pagado, revisar si dejó deuda de 500
+                    if "debe" in col_recargo:
+                        deuda_extra = 500
+                        deuda_total += 500
                 
                 if nombre not in datos:
                     datos[nombre] = {}
@@ -135,6 +144,7 @@ def obtener_recaudacion():
     
     for mes in MESES:
         total_transferencia = 0
+        mes_num = MESES_NUM[mes]
         try:
             hoja = todas_las_hojas.get(mes)
             if not hoja:
@@ -145,36 +155,29 @@ def obtener_recaudacion():
                 nombre = fila[0].strip()
                 if not nombre: continue
                 
-                # Verificar si está pagado (en cualquier columna)
                 es_pagado = any("PAGADO" in str(celda).upper() for celda in fila)
-                
-                # Verificar si el método es transferencia (SOLO columna C, índice 2)
                 metodo = fila[2].strip().lower() if len(fila) > 2 else ""
                 es_transferencia = metodo == "transferencia"
                 
                 if es_pagado and es_transferencia:
                     monto = VALOR_CUOTA
                     
-                    # Extra fijo solo en abril (columna D con "300")
-                    if mes == "abril":
-                        col_extra = fila[3].strip().lower() if len(fila) > 3 else ""
-                        if "300" in col_extra:
-                            monto += 300
+                    # Extra fijo de abril (300)
+                    if mes == "abril" and len(fila) > 3 and "300" in fila[3]:
+                        monto += 300
                     
-                    # Determinar qué columna contiene el recargo según el mes
+                    # Determinar columna del recargo
                     if mes == "marzo":
                         col_recargo = fila[3].strip().lower() if len(fila) > 3 else ""
                     elif mes == "abril":
                         col_recargo = fila[4].strip().lower() if len(fila) > 4 else ""
-                    else:  # Mayo a Octubre
+                    else:
                         col_recargo = fila[3].strip().lower() if len(fila) > 3 else ""
                     
-                    # 🔴 CORRECCIÓN DEFINITIVA:
-                    # Solo sumar $500 si la casilla dice "500" o "500 listo" (indica que el recargo SÍ fue pagado)
-                    # Si está vacía, significa que pagó a tiempo y NO se suma.
-                    # Si dice "debe", significa que aún no paga y NO se suma.
-                    if col_recargo and "debe" not in col_recargo and "500" in col_recargo:
-                        monto += 500
+                    # 🔴 SOLO SUMAR RECARGO DE 500 EN MESES <= JUNIO
+                    if mes_num <= 6:
+                        if col_recargo and "debe" not in col_recargo and "500" in col_recargo:
+                            monto += 500
                     
                     total_transferencia += monto
                     
@@ -207,7 +210,7 @@ def marcar_pagado(cambio: Cambio):
             hoja.update_cell(i, 3, cambio.metodo)
             if cambio.pagar_deuda:
                 hoja.update_cell(i, 4, "")
-            return {"mensaje": f"{cambio.nombre} actualizado en {cambio.mes}"}
+            return {"mensaje": f"{cambio.nombre} actualiz$20000ado en {cambio.mes}"}
     
     raise HTTPException(status_code=404, detail="Persona no encontrada")
 
