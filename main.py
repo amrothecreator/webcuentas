@@ -18,7 +18,7 @@ PASSWORD_ADMIN = os.getenv("PASSWORD_ADMIN")
 CREDENTIALS_JSON = os.getenv("GOOGLE_CREDENTIALS_JSON")
 
 # 🔴 CAMBIA ESTE VALOR POR EL DE TU CUOTA MENSUAL (ej: 2000, 2500, 10000, etc.)
-VALOR_CUOTA = 2000 
+VALOR_CUOTA = 2500 
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
@@ -210,7 +210,7 @@ def marcar_pagado(cambio: Cambio):
             hoja.update_cell(i, 3, cambio.metodo)
             if cambio.pagar_deuda:
                 hoja.update_cell(i, 4, "")
-            return {"mensaje": f"{cambio.nombre} actualiz$20000ado en {cambio.mes}"}
+            return {"mensaje": f"{cambio.nombre} actualizado en {cambio.mes}"}
     
     raise HTTPException(status_code=404, detail="Persona no encontrada")
 
