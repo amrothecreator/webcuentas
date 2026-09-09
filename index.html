@@ -12,11 +12,49 @@
         .admin-btn { background: green; color: white; border: none; cursor: pointer; }
         .deuda-btn { background: #d9534f; color: white; border: none; cursor: pointer; }
         .metodo-btn { background: #555; color: white; border: none; padding: 5px 10px; margin-left: 5px; cursor: pointer; }
+
+        /* Estilos del modal principal */
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
         .modal-contenido { background-color: #fefefe; margin: 10% auto; padding: 20px; border-radius: 10px; width: 50%; max-width: 600px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); position: relative; }
         .cerrar { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
         .lista-meses { list-style: none; padding: 0; }
         .lista-meses li { padding: 10px; border-bottom: 1px solid #eee; }
+
+        /* Estilos del modal de contraseña */
+        .modal-password {
+            display: none;
+            position: fixed;
+            z-index: 1100; /* Por encima del otro modal */
+            left: 0; top: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.7);
+        }
+        .modal-password-contenido {
+            background-color: #fff;
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 10px;
+            width: 300px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        .modal-password input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .modal-password button {
+            width: 100%;
+            padding: 10px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .modal-password button:hover { background: #0056b3; }
     </style>
 </head>
 <body>
@@ -45,6 +83,7 @@
         </table>
     </div>
 
+    <!-- Modal para mostrar detalles de persona -->
     <div id="miModal" class="modal">
         <div class="modal-contenido">
             <span class="cerrar" onclick="cerrarModal()">&times;</span>
@@ -52,9 +91,44 @@
         </div>
     </div>
 
+    <!-- Modal para pedir contraseña (oculto por defecto) -->
+    <div id="modalPass" class="modal-password">
+        <div class="modal-password-contenido">
+            <h3 id="tituloPass">Ingrese su contraseña</h3>
+            <input type="password" id="inputPass" placeholder="••••••••" autocomplete="off">
+            <button onclick="confirmarPassword()">Confirmar</button>
+            <button onclick="cancelarPassword()" style="background:#6c757d; margin-top:5px;">Cancelar</button>
+        </div>
+    </div>
+
     <script>
         let esAdmin = false;
         let datosGlobales = {};
+        
+        // Variables para manejar la promesa de la contraseña
+        let resolverPass;
+
+        // Función que muestra el modal y devuelve una promesa con el valor o null si cancela
+        function pedirPassword(titulo) {
+            return new Promise((resolve) => {
+                resolverPass = resolve;
+                document.getElementById('tituloPass').innerText = titulo;
+                document.getElementById('inputPass').value = '';
+                document.getElementById('modalPass').style.display = 'block';
+                document.getElementById('inputPass').focus();
+            });
+        }
+
+        function confirmarPassword() {
+            const val = document.getElementById('inputPass').value;
+            document.getElementById('modalPass').style.display = 'none';
+            if (resolverPass) resolverPass(val);
+        }
+
+        function cancelarPassword() {
+            document.getElementById('modalPass').style.display = 'none';
+            if (resolverPass) resolverPass(null);
+        }
 
         async function cargarDatos() {
             const respuesta = await fetch('/api/datos');
@@ -134,8 +208,9 @@
             if (div) div.style.display = div.style.display === 'none' ? 'block' : 'none';
         }
 
+        // Modificado para usar el modal de contraseña
         async function marcarPagado(nombre, mes, metodo, pagarDeuda) {
-            const pass = prompt("Confirma contraseña de admin:");
+            const pass = await pedirPassword("Confirma contraseña de admin:");
             if (!pass) return;
 
             const respuesta = await fetch('/api/marcar_pagado', {
@@ -146,7 +221,7 @@
 
             if (respuesta.ok) {
                 await cargarDatos();
-                verDetalle(nombre);
+                verDetalle(nombre); // Refrescar el detalle
                 if (esAdmin) await cargarRecaudacion();
             } else {
                 alert("Error: Contraseña incorrecta.");
@@ -163,14 +238,17 @@
             if (event.target == modal) modal.style.display = 'none';
         }
 
+        // Modificado para usar el modal de contraseña
         async function loginAdmin() {
-            const pass = prompt("Contraseña de administrador:");
+            const pass = await pedirPassword("Contraseña de administrador:");
             if (!pass) return;
+
             const respuesta = await fetch('/api/login', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ password: pass }) 
             });
+
             if (respuesta.ok) {
                 esAdmin = true;
                 alert("Modo administrador activado.");
