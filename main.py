@@ -102,8 +102,10 @@ def analizar_fila(mes, fila, mes_actual):
     texto = celda(fila, indice_recargo(mes))
     # Los recargos existen SOLO en marzo y abril. Cualquier "debe" en otros meses se ignora.
     aplica_recargo = mes_num <= 4
-    debe = aplica_recargo and "debe" in texto
-    recargo_pagado = aplica_recargo and ("500" in texto) and "debe" not in texto
+    # En la hoja un recargo sin pagar puede decir "debe 500" o "500 pendiente".
+    texto_pendiente = "debe" in texto or "pendiente" in texto
+    debe = aplica_recargo and texto_pendiente
+    recargo_pagado = aplica_recargo and ("500" in texto) and not texto_pendiente
     atrasado = aplica_recargo and mes_num < mes_actual
     # Si la celda dice "debe 1000", se usa ese monto; si no trae número, 500.
     m = re.search(r"\d[\d.]*", texto)
@@ -197,12 +199,12 @@ def obtener_recaudacion():
             col_d = celda(fila, 3)
             col_e = celda(fila, 4)
             if mes == "abril":
-                if "300 listo" in col_d:
+                if "300 listo" in col_d and "efectivo" not in col_d and "no transf" not in col_d:
                     monto += 300
                 if "500 pagado" in col_e:
                     monto += 500
             elif mes_num <= 6:
-                if "500" in col_d and "debe" not in col_d:
+                if "500" in col_d and "debe" not in col_d and "pendiente" not in col_d:
                     monto += 500
             total += monto
         recaudacion[mes] = total
@@ -248,7 +250,7 @@ def pagar_lote(lote: Lote):
                 data.append({"range": f"'{t}'!{letra}{row}", "values": [[texto_pagado]]})
             elif item.cuota and not a["pagado"] and a["atrasado"] and not a["recargo_pagado"] and not a["debe"]:
                 # Se pagó la cuota atrasada pero no el recargo: queda registrado como deuda.
-                data.append({"range": f"'{t}'!{letra}{row}", "values": [["debe 500"]]})
+                data.append({"range": f"'{t}'!{letra}{row}", "values": [["500 pendiente" if mes == "abril" else "debe 500"]]})
 
         if data:
             for intento in range(2):
