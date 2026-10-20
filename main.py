@@ -158,11 +158,15 @@ def read_index():
     return FileResponse("index.html")
 
 
-@app.get("/gengar.png")
-def gengar_png():
-    if not os.path.exists("gengar.png"):
-        raise HTTPException(status_code=404, detail="Falta gengar.png")
-    return FileResponse("gengar.png", media_type="image/png")
+IMAGENES = {"gengar", "gengar2"}
+
+
+@app.get("/{nombre}.png")
+def imagen_png(nombre: str):
+    archivo = f"{nombre}.png"
+    if nombre not in IMAGENES or not os.path.exists(archivo):
+        raise HTTPException(status_code=404, detail=f"Falta {archivo}")
+    return FileResponse(archivo, media_type="image/png")
 
 
 @app.get("/api/datos")
