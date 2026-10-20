@@ -2,59 +2,77 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Control de Cuotas</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
-        table { width: 100%; border-collapse: collapse; background: white; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background: #333; color: white; }
-        input, button { padding: 10px; margin: 5px; }
-        .admin-btn { background: green; color: white; border: none; cursor: pointer; }
+        :root{--bg:#f3f5fb;--card:#fff;--text:#1f2937;--muted:#6b7280;--line:#e5e7eb;--brand:#4f46e5;--brand2:#7c3aed;--soft:#eef2ff;--ok:#15803d;--okbg:#dcfce7;--bad:#b91c1c;--badbg:#fee2e2;--shadow:0 6px 24px rgba(31,41,55,.08)}
+        @media(prefers-color-scheme:dark){:root{--bg:#0f172a;--card:#1e293b;--text:#e5e7eb;--muted:#94a3b8;--line:#334155;--soft:#2b3654;--ok:#86efac;--okbg:#14532d;--bad:#fca5a5;--badbg:#7f1d1d;--shadow:0 6px 24px rgba(0,0,0,.35)}}
+        *{box-sizing:border-box}
+        body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text)}
+        button{font:inherit;cursor:pointer;border:none}
+        .hero{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;padding:30px 20px 76px}
+        .hero-in,.wrap{max-width:960px;margin:0 auto}
+        .hero h1{margin:0;font-size:1.7rem}
+        .hero p{margin:6px 0 0;opacity:.85}
+        .wrap{padding:0 16px 40px;margin-top:-52px}
+        .toolbar{display:flex;gap:10px;margin-bottom:16px}
+        .toolbar input{flex:1;min-width:0;padding:13px 16px;border:none;border-radius:12px;background:var(--card);color:var(--text);font:inherit;box-shadow:var(--shadow);outline:none}
+        .toolbar input:focus{box-shadow:0 0 0 3px rgba(79,70,229,.35)}
+        .btn-admin{padding:13px 18px;border-radius:12px;background:var(--card);color:var(--brand);font-weight:600;box-shadow:var(--shadow);white-space:nowrap}
+        .btn-admin.activo{background:var(--okbg);color:var(--ok)}
+        .card{background:var(--card);border-radius:16px;box-shadow:var(--shadow);overflow-x:auto}
+        .sec{font-size:1.15rem;margin:0 0 12px}
+        table{width:100%;border-collapse:collapse}
+        th{padding:14px;text-align:left;font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line)}
+        td{padding:13px 14px;border-bottom:1px solid var(--line)}
+        tbody tr:last-child td{border-bottom:none}
+        tbody tr:hover{background:var(--soft)}
+        td:first-child{font-weight:600}
+        .badge{display:inline-block;padding:4px 12px;border-radius:999px;font-weight:700;font-size:.9rem}
+        .badge.ok{background:var(--okbg);color:var(--ok)}
+        .badge.mal{background:var(--badbg);color:var(--bad)}
+        .btn-ver{padding:7px 16px;border-radius:10px;background:var(--soft);color:var(--brand);font-weight:600}
+        .btn-ver:hover{background:var(--brand);color:#fff}
 
-        /* ESTILOS DEL POP-UP (MODAL) */
-        .modal {
-            display: none; /* Oculto por defecto */
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5); /* Fondo oscuro */
-        }
-        .modal-contenido {
-            background-color: #fefefe;
-            margin: 10% auto;
-            padding: 20px;
-            border-radius: 10px;
-            width: 50%;
-            max-width: 500px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            position: relative;
-        }
-        .cerrar {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        .cerrar:hover, .cerrar:focus {
-            color: black;
-            text-decoration: none;
-            cursor: pointer;
-        }
-        /* Lista dentro del modal */
-        .lista-meses { list-style: none; padding: 0; }
-        .lista-meses li { padding: 10px; border-bottom: 1px solid #eee; }
+        .modal{display:none;position:fixed;z-index:1000;inset:0;background:rgba(15,23,42,.55);backdrop-filter:blur(3px);overflow-y:auto}
+        .modal-contenido{background:var(--card);margin:5% auto;padding:24px;border-radius:20px;width:92%;max-width:660px;box-shadow:0 20px 50px rgba(0,0,0,.3);position:relative;animation:sube .2s ease-out}
+        @keyframes sube{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+        .modal-contenido h2{margin:0 0 14px}
+        .cerrar{position:absolute;right:16px;top:10px;color:var(--muted);font-size:30px;cursor:pointer;line-height:1}
+        .cerrar:hover{color:var(--text)}
+        .lista-meses{list-style:none;padding:0;margin:0}
+        .lista-meses li{padding:12px 14px;margin-bottom:8px;border:1px solid var(--line);border-radius:12px}
+        .rojo{color:var(--bad);font-weight:600}
+        .gris{color:var(--muted)}
+        .checks{margin-top:8px;display:flex;flex-wrap:wrap;gap:8px}
+        .chk,.panel-admin label{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border:1px solid var(--line);border-radius:999px;cursor:pointer;user-select:none;margin:0}
+        .chk:has(input:checked),.panel-admin label:has(input:checked){background:var(--soft);border-color:var(--brand);color:var(--brand);font-weight:600}
+        .chk input{transform:none;margin:0}
+        .panel-admin{background:var(--soft);border-radius:14px;padding:14px;margin-top:14px}
+        .panel-admin>div{margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+        .metodo-btn{padding:8px 14px;margin:0 6px 0 0;border-radius:10px;background:var(--card);color:var(--brand);font-weight:600;border:1px solid var(--line)}
+        .metodo-btn:hover{border-color:var(--brand)}
+        #resumen{font-weight:700;display:block}
+        .admin-btn{width:100%;padding:13px;margin-top:10px;border-radius:12px;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;font-weight:700}
+        .admin-btn:disabled{background:var(--line);color:var(--muted);cursor:not-allowed}
+
+        .modal-password{display:none;position:fixed;z-index:1100;inset:0;background:rgba(15,23,42,.7);backdrop-filter:blur(3px)}
+        .modal-password-contenido{background:var(--card);margin:18vh auto 0;padding:24px;border-radius:18px;width:320px;max-width:90%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.35)}
+        .modal-password input{width:100%;padding:12px;margin:10px 0;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--text);font:inherit}
+        .modal-password button{width:100%;padding:12px;background:var(--brand);color:#fff;border-radius:10px;font-weight:600}
+
+        #guardando{display:none;position:fixed;right:16px;bottom:16px;background:#111827;color:#fff;padding:11px 18px;border-radius:999px;z-index:1200;box-shadow:var(--shadow);font-size:.9rem}
+        @media(max-width:600px){.hero h1{font-size:1.4rem}.toolbar{flex-direction:column}th,td{padding:10px 8px;font-size:.9rem}.modal-contenido{margin:3% auto;padding:18px}}
     </style>
 </head>
 <body>
-    <h1>Control de Cuotas (Marzo - Octubre)</h1>
-    <input type="text" id="buscador" placeholder="Buscar persona..." onkeyup="filtrar()">
-    <button onclick="loginAdmin()">Soy Admin</button>
-    
-    <table id="tabla">
+    <div class="hero"><div class="hero-in"><h1>💳 Control de Cuotas</h1><p>Marzo – Octubre</p></div></div>
+    <div class="wrap">
+    <div class="toolbar">
+        <input type="text" id="buscador" placeholder="🔍 Buscar persona..." onkeyup="filtrar()">
+        <button id="btn-admin" class="btn-admin" onclick="loginAdmin()">🔒 Soy Admin</button>
+    </div>
+    <div class="card"><table id="tabla">
         <thead>
             <tr>
                 <th>Nombre</th>
@@ -65,9 +83,17 @@
             </tr>
         </thead>
         <tbody id="cuerpo-tabla"></tbody>
-    </table>
+    </table></div>
 
-    <!-- ESTRUCTURA DEL POP-UP -->
+    <div id="tabla-recaudacion" style="display:none; margin-top:24px;">
+        <h2 class="sec">💰 Recaudado por Transferencia</h2>
+        <div class="card"><table>
+            <thead><tr><th>Mes</th><th>Total</th></tr></thead>
+            <tbody id="cuerpo-recaudacion"></tbody>
+        </table></div>
+    </div>
+    </div>
+
     <div id="miModal" class="modal">
         <div class="modal-contenido">
             <span class="cerrar" onclick="cerrarModal()">&times;</span>
@@ -75,108 +101,347 @@
         </div>
     </div>
 
-    <script>
-        let esAdmin = false;
-        let datosGlobales = {};
+    <div id="modalPass" class="modal-password">
+        <div class="modal-password-contenido">
+            <h3 id="tituloPass">Ingrese su contraseña</h3>
+            <input type="password" id="inputPass" placeholder="••••••••" autocomplete="off">
+            <button onclick="confirmarPassword()">Confirmar</button>
+            <button onclick="cancelarPassword()" style="background:#6c757d; margin-top:5px;">Cancelar</button>
+        </div>
+    </div>
 
-        async function cargarDatos() {
-            const respuesta = await fetch('/api/datos'); 
-            datosGlobales = await respuesta.json();
-            renderTabla();
+    <div id="guardando"></div>
+
+    <script>
+        const VALOR_CUOTA = 2000;
+        const RECARGO = 500;
+
+        let esAdmin = false;
+        let adminPass = '';            // se guarda en memoria tras el login (no se vuelve a pedir)
+        let datosGlobales = {};
+        let nombreAbierto = null;
+        let seleccion = {};            // { "mayo|cuota": true, "mayo|recargo": true }
+        let metodoSel = '';
+
+        // Cola: los envíos al servidor salen de a uno, en orden, sin pisarse.
+        let cola = Promise.resolve();
+        let pendientes = 0;
+
+        let resolverPass;
+
+        function esc(s) {
+            return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
         }
 
-        function renderTabla() {
-            const cuerpo = document.getElementById('cuerpo-tabla');
-            cuerpo.innerHTML = '';
-            for (const [nombre, meses] of Object.entries(datosGlobales)) {
-                let pagados = 0, pendientes = 0, deuda = 0;
-                for (const [mes, info] of Object.entries(meses)) {
-                    if (info.estado === 'PAGADO') pagados++;
-                    else pendientes++;
-                    deuda += info.deuda;
-                }
-                cuerpo.innerHTML += `
-                    <tr>
-                        <td>${nombre}</td>
-                        <td>${pagados}</td>
-                        <td>${pendientes}</td>
-                        <td>$${deuda}</td>
-                        <td><button onclick="verDetalle('${nombre}')">Ver</button></td>
-                    </tr>
-                `;
+        /* ---------- Contraseña ---------- */
+        function pedirPassword(titulo) {
+            return new Promise((resolve) => {
+                resolverPass = resolve;
+                document.getElementById('tituloPass').innerText = titulo;
+                document.getElementById('inputPass').value = '';
+                document.getElementById('modalPass').style.display = 'block';
+                document.getElementById('inputPass').focus();
+            });
+        }
+        function confirmarPassword() {
+            const val = document.getElementById('inputPass').value;
+            document.getElementById('modalPass').style.display = 'none';
+            if (resolverPass) resolverPass(val);
+        }
+        function cancelarPassword() {
+            document.getElementById('modalPass').style.display = 'none';
+            if (resolverPass) resolverPass(null);
+        }
+        document.getElementById('inputPass').addEventListener('keydown', e => {
+            if (e.key === 'Enter') confirmarPassword();
+        });
+
+        /* ---------- Carga de datos ---------- */
+        async function sincronizar() {
+            try {
+                const r = await fetch('/api/datos');
+                if (!r.ok) throw new Error('Error al cargar datos');
+                const d = await r.json();
+                if (pendientes > 0) return;   // hay cambios en camino: no pisar el estado local
+                datosGlobales = d;
+                renderTabla();
+                if (document.getElementById('miModal').style.display === 'block') renderDetalle();
+                if (esAdmin) await cargarRecaudacion();
+            } catch (e) {
+                console.error(e);
+                document.getElementById('cuerpo-tabla').innerHTML =
+                    '<tr><td colspan="5">No se pudieron cargar los datos. Recarga la página.</td></tr>';
             }
         }
 
-        // Función para abrir el modal
+        async function cargarRecaudacion() {
+            const r = await fetch('/api/recaudacion');
+            if (!r.ok) return;
+            const data = await r.json();
+            const cuerpo = document.getElementById('cuerpo-recaudacion');
+            cuerpo.innerHTML = '';
+            for (const [mes, total] of Object.entries(data.recaudacion)) {
+                cuerpo.innerHTML += `<tr><td>${mes.toUpperCase()}</td><td>$${total}</td></tr>`;
+            }
+        }
+
+        /* ---------- Tabla principal ---------- */
+        function renderTabla() {
+            let html = '';
+            for (const [nombre, meses] of Object.entries(datosGlobales)) {
+                let pagados = 0, pend = 0, deuda = 0;
+                for (const info of Object.values(meses)) {
+                    if (info.estado === 'PAGADO') pagados++; else pend++;
+                    deuda += info.deuda;
+                }
+                html += `<tr>
+                    <td>${esc(nombre)}</td><td>${pagados}</td><td>${pend}</td><td><span class="badge ${deuda > 0 ? 'mal' : 'ok'}">$${deuda}</span></td>
+                    <td><button class="btn-ver" data-ver="${esc(nombre)}">Ver</button></td>
+                </tr>`;
+            }
+            document.getElementById('cuerpo-tabla').innerHTML = html;
+            filtrar();
+        }
+        document.getElementById('cuerpo-tabla').addEventListener('click', e => {
+            const b = e.target.closest('button[data-ver]');
+            if (b) verDetalle(b.dataset.ver);
+        });
+
+        /* ---------- Detalle de persona ---------- */
         function verDetalle(nombre) {
-            const meses = datosGlobales[nombre];
-            let html = `<h2>${nombre}</h2><ul class="lista-meses">`;
+            nombreAbierto = nombre;
+            seleccion = {};
+            renderDetalle();
+            document.getElementById('miModal').style.display = 'block';
+        }
+
+        function renderDetalle() {
+            const meses = datosGlobales[nombreAbierto];
+            if (!meses) return;
+            let html = `<h2>${esc(nombreAbierto)}</h2><ul class="lista-meses">`;
+
             for (const [mes, info] of Object.entries(meses)) {
-                const estado = info.estado === 'PAGADO' ? '✅ Pagado' : '❌ Pendiente';
-                let extraHTML = info.extra > 0 ? ` (Extra $${info.extra})` : '';
-                let deudaHTML = info.deuda > 0 ? ` (Debe $${info.deuda})` : '';
-                
-                html += `<li>${mes.toUpperCase()}: ${estado}${extraHTML}${deudaHTML}`;
-                if (esAdmin && info.estado !== 'PAGADO') {
-                    html += ` <button class="admin-btn" onclick="marcarPagado('${nombre}', '${mes}')">Marcar Pagado</button>`;
+                const pagado = info.estado === 'PAGADO';
+                const estado = pagado
+                    ? `✅ Pagado${info.metodo ? ` (${esc(info.metodo)})` : ''}`
+                    : `❌ Pendiente ($${VALOR_CUOTA})`;
+                let rec = '';
+                if (info.recargo_pendiente > 0) rec = ` <span class="rojo">· Recargo $${info.recargo_pendiente} pendiente</span>`;
+                else if (info.recargo_pagado) rec = ` <span class="gris">· Recargo pagado</span>`;
+
+                html += `<li><strong>${mes.toUpperCase()}</strong>: ${estado}${rec}`;
+
+                if (esAdmin) {
+                    let checks = '';
+                    if (!pagado) {
+                        checks += `<label class="chk"><input type="checkbox" data-mes="${mes}" data-tipo="cuota" ${seleccion[mes + '|cuota'] ? 'checked' : ''}> Cuota $${VALOR_CUOTA}</label>`;
+                    }
+                    if (info.recargo_pendiente > 0) {
+                        checks += `<label class="chk"><input type="checkbox" data-mes="${mes}" data-tipo="recargo" ${seleccion[mes + '|recargo'] ? 'checked' : ''}> Recargo $${info.recargo_pendiente}</label>`;
+                    }
+                    if (checks) html += `<div class="checks">${checks}</div>`;
                 }
                 html += `</li>`;
             }
             html += `</ul>`;
-            
-            // Ponemos el contenido en el modal
+
+            if (esAdmin) {
+                html += `<div class="panel-admin">
+                    <button class="metodo-btn" id="btn-sel-todo">Seleccionar todo lo pendiente</button>
+                    <button class="metodo-btn" id="btn-limpiar">Limpiar</button>
+                    <div style="margin-top:8px">Método de pago de las cuotas:
+                        <label><input type="radio" name="metodo" value="efectivo" ${metodoSel === 'efectivo' ? 'checked' : ''}> 💵 Efectivo</label>
+                        <label><input type="radio" name="metodo" value="transferencia" ${metodoSel === 'transferencia' ? 'checked' : ''}> 🏦 Transferencia</label>
+                    </div>
+                    <div id="resumen"></div>
+                    <button class="admin-btn" id="btn-registrar">Registrar seleccionados</button>
+                </div>`;
+            }
+
             document.getElementById('detalle-persona').innerHTML = html;
-            // Mostramos el modal
-            document.getElementById('miModal').style.display = 'block';
+            actualizarResumen();
         }
 
-        // Función para cerrar el modal
-        function cerrarModal() {
-            document.getElementById('miModal').style.display = 'none';
+        function actualizarResumen() {
+            const el = document.getElementById('resumen');
+            if (!el) return;
+            let cuotas = 0, recargos = 0, montoRec = 0;
+            for (const [k, v] of Object.entries(seleccion)) {
+                if (!v) continue;
+                if (k.endsWith('|cuota')) cuotas++;
+                else {
+                    recargos++;
+                    const inf = (datosGlobales[nombreAbierto] || {})[k.split('|')[0]];
+                    montoRec += inf ? inf.recargo_pendiente : RECARGO;
+                }
+            }
+            const total = cuotas * VALOR_CUOTA + montoRec;
+            el.textContent = (cuotas + recargos === 0)
+                ? 'Nada seleccionado'
+                : `Seleccionado: ${cuotas} cuota(s) + ${recargos} recargo(s) = $${total}`;
+            document.getElementById('btn-registrar').disabled = (cuotas + recargos === 0);
         }
 
-        // Cerrar si haces clic fuera del cuadro blanco
-        window.onclick = function(event) {
-            const modal = document.getElementById('miModal');
-            if (event.target == modal) {
-                modal.style.display = 'none';
+        // Un solo listener para casillas, radios y botones del panel
+        const detalleEl = document.getElementById('detalle-persona');
+        detalleEl.addEventListener('change', e => {
+            const t = e.target;
+            if (t.matches('input[type=checkbox][data-mes]')) {
+                seleccion[t.dataset.mes + '|' + t.dataset.tipo] = t.checked;
+                actualizarResumen();
+            } else if (t.matches('input[name=metodo]')) {
+                metodoSel = t.value;
+            }
+        });
+        detalleEl.addEventListener('click', e => {
+            const id = e.target.id;
+            if (id === 'btn-sel-todo') {
+                const meses = datosGlobales[nombreAbierto] || {};
+                for (const [mes, info] of Object.entries(meses)) {
+                    if (info.estado !== 'PAGADO') seleccion[mes + '|cuota'] = true;
+                    if (info.recargo_pendiente > 0) seleccion[mes + '|recargo'] = true;
+                }
+                renderDetalle();
+            } else if (id === 'btn-limpiar') {
+                seleccion = {};
+                renderDetalle();
+            } else if (id === 'btn-registrar') {
+                registrarSeleccion();
+            }
+        });
+
+        /* ---------- Registrar pagos ---------- */
+        function registrarSeleccion() {
+            const porMes = {};
+            for (const [k, v] of Object.entries(seleccion)) {
+                if (!v) continue;
+                const [mes, tipo] = k.split('|');
+                if (!porMes[mes]) porMes[mes] = { mes, cuota: false, recargo: false };
+                porMes[mes][tipo] = true;
+            }
+            const items = Object.values(porMes);
+            if (items.length === 0) return;
+
+            const hayCuotas = items.some(i => i.cuota);
+            if (hayCuotas && !metodoSel) {
+                alert('Elige el método de pago (efectivo o transferencia) para las cuotas.');
+                return;
+            }
+
+            const payload = {
+                nombre: nombreAbierto,
+                password: adminPass,
+                metodo: hayCuotas ? metodoSel : '',
+                items
+            };
+
+            // Actualización inmediata en pantalla; el servidor se entera en segundo plano.
+            aplicarLocal(nombreAbierto, items, metodoSel);
+            seleccion = {};
+            renderTabla();
+            renderDetalle();
+
+            encolar(() => enviar(payload));
+        }
+
+        function aplicarLocal(nombre, items, metodo) {
+            const meses = datosGlobales[nombre];
+            for (const it of items) {
+                const info = meses[it.mes];
+                if (!info) continue;
+                const eraPagado = info.estado === 'PAGADO';
+                if (it.cuota && !eraPagado) { info.estado = 'PAGADO'; info.metodo = metodo; }
+                if (it.recargo && info.recargo_pendiente > 0) {
+                    info.recargo_pendiente = 0;
+                    info.recargo_pagado = true;
+                } else if (it.cuota && !eraPagado && info.atrasado && !info.recargo_pagado) {
+                    info.recargo_pendiente = RECARGO;
+                }
+                info.deuda = (info.estado === 'PAGADO' ? 0 : VALOR_CUOTA) + info.recargo_pendiente;
             }
         }
 
-        function loginAdmin() {
-            const pass = prompt("Contraseña de administrador:");
-            // (Aquí puedes validar con un endpoint o dejarlo simple)
-            esAdmin = true; 
-            alert("Modo administrador activado. Ahora puedes marcar pagos.");
-            renderTabla();
+        async function enviar(payload) {
+            const r = await fetch('/api/pagar_lote', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (!r.ok) {
+                let msg = 'Error al guardar';
+                if (r.status === 401) msg = 'Contraseña incorrecta';
+                else { try { msg = (await r.json()).detail || msg; } catch (_) {} }
+                throw new Error(msg);
+            }
         }
 
-        async function marcarPagado(nombre, mes) {
-            const pass = prompt("Confirma tu contraseña de admin para modificar:");
-            const respuesta = await fetch('api/marcar_pagado', {
+        function encolar(tarea) {
+            pendientes++;
+            actualizarIndicador();
+            cola = cola
+                .then(tarea)
+                .catch(err => { alert('No se guardó un pago: ' + err.message + '\nSe recargarán los datos reales.'); })
+                .finally(() => {
+                    pendientes--;
+                    actualizarIndicador();
+                    if (pendientes === 0) sincronizar();   // reconcilia con la hoja real
+                });
+        }
+
+        function actualizarIndicador() {
+            const el = document.getElementById('guardando');
+            el.style.display = pendientes > 0 ? 'block' : 'none';
+            el.textContent = `⏳ Guardando… (${pendientes} pendiente${pendientes === 1 ? '' : 's'})`;
+        }
+
+        window.addEventListener('beforeunload', e => {
+            if (pendientes > 0) { e.preventDefault(); e.returnValue = ''; }
+        });
+
+        /* ---------- Modal y login ---------- */
+        function cerrarModal() { document.getElementById('miModal').style.display = 'none'; }
+        window.onclick = function (event) {
+            const modal = document.getElementById('miModal');
+            if (event.target == modal) modal.style.display = 'none';
+        };
+
+        async function loginAdmin() {
+            const pass = await pedirPassword('Contraseña de administrador:');
+            if (!pass) return;
+
+            const respuesta = await fetch('/api/login', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ nombre, mes, password: pass })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: pass })
             });
+
             if (respuesta.ok) {
-                alert("¡Pago registrado en Google Sheets!");
-                cerrarModal(); // Cerramos el modal
-                cargarDatos(); // Recargar datos
+                esAdmin = true;
+                adminPass = pass;
+                const ba = document.getElementById('btn-admin'); ba.textContent = '🔓 Admin activo'; ba.classList.add('activo');
+                alert('Modo administrador activado.');
+                renderTabla();
+                document.getElementById('tabla-recaudacion').style.display = 'block';
+                await cargarRecaudacion();
             } else {
-                alert("Error: Contraseña incorrecta o persona no encontrada.");
+                alert('Contraseña incorrecta.');
+                esAdmin = false;
+                adminPass = '';
+                const bb = document.getElementById('btn-admin'); bb.textContent = '🔒 Soy Admin'; bb.classList.remove('activo');
+                renderTabla();
+                document.getElementById('tabla-recaudacion').style.display = 'none';
             }
         }
 
         function filtrar() {
             const texto = document.getElementById('buscador').value.toLowerCase();
-            const filas = document.querySelectorAll('#cuerpo-tabla tr');
-            filas.forEach(fila => {
-                const nombre = fila.cells[0].textContent.toLowerCase();
+            document.querySelectorAll('#cuerpo-tabla tr').forEach(fila => {
+                const nombre = fila.cells[0] ? fila.cells[0].textContent.toLowerCase() : '';
                 fila.style.display = nombre.includes(texto) ? '' : 'none';
             });
         }
 
-        cargarDatos();
+        sincronizar();
     </script>
 </body>
 </html>
