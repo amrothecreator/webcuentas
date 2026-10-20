@@ -10,51 +10,43 @@
         th { background: #333; color: white; }
         input, button { padding: 10px; margin: 5px; }
         .admin-btn { background: green; color: white; border: none; cursor: pointer; }
-        .deuda-btn { background: #d9534f; color: white; border: none; cursor: pointer; }
-        .metodo-btn { background: #555; color: white; border: none; padding: 5px 10px; margin-left: 5px; cursor: pointer; }
 
-        /* Estilos del modal principal */
-        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
-        .modal-contenido { background-color: #fefefe; margin: 10% auto; padding: 20px; border-radius: 10px; width: 50%; max-width: 600px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); position: relative; }
-        .cerrar { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
-        .lista-meses { list-style: none; padding: 0; }
-        .lista-meses li { padding: 10px; border-bottom: 1px solid #eee; }
-
-        /* Estilos del modal de contraseña */
-        .modal-password {
-            display: none;
+        /* ESTILOS DEL POP-UP (MODAL) */
+        .modal {
+            display: none; /* Oculto por defecto */
             position: fixed;
-            z-index: 1100; /* Por encima del otro modal */
-            left: 0; top: 0; width: 100%; height: 100%;
-            background-color: rgba(0,0,0,0.7);
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5); /* Fondo oscuro */
         }
-        .modal-password-contenido {
-            background-color: #fff;
-            margin: 15% auto;
+        .modal-contenido {
+            background-color: #fefefe;
+            margin: 10% auto;
             padding: 20px;
             border-radius: 10px;
-            width: 300px;
-            text-align: center;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            width: 50%;
+            max-width: 500px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            position: relative;
         }
-        .modal-password input {
-            width: 100%;
-            padding: 10px;
-            margin: 10px 0;
-            box-sizing: border-box;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-        }
-        .modal-password button {
-            width: 100%;
-            padding: 10px;
-            background: #007bff;
-            color: white;
-            border: none;
-            border-radius: 5px;
+        .cerrar {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
             cursor: pointer;
         }
-        .modal-password button:hover { background: #0056b3; }
+        .cerrar:hover, .cerrar:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        /* Lista dentro del modal */
+        .lista-meses { list-style: none; padding: 0; }
+        .lista-meses li { padding: 10px; border-bottom: 1px solid #eee; }
     </style>
 </head>
 <body>
@@ -75,15 +67,7 @@
         <tbody id="cuerpo-tabla"></tbody>
     </table>
 
-    <div id="tabla-recaudacion" style="display:none; margin-top:30px;">
-        <h2>💰 Recaudado por Transferencia</h2>
-        <table>
-            <thead><tr><th>Mes</th><th>Total</th></tr></thead>
-            <tbody id="cuerpo-recaudacion"></tbody>
-        </table>
-    </div>
-
-    <!-- Modal para mostrar detalles de persona -->
+    <!-- ESTRUCTURA DEL POP-UP -->
     <div id="miModal" class="modal">
         <div class="modal-contenido">
             <span class="cerrar" onclick="cerrarModal()">&times;</span>
@@ -91,63 +75,14 @@
         </div>
     </div>
 
-    <!-- Modal para pedir contraseña (oculto por defecto) -->
-    <div id="modalPass" class="modal-password">
-        <div class="modal-password-contenido">
-            <h3 id="tituloPass">Ingrese su contraseña</h3>
-            <input type="password" id="inputPass" placeholder="••••••••" autocomplete="off">
-            <button onclick="confirmarPassword()">Confirmar</button>
-            <button onclick="cancelarPassword()" style="background:#6c757d; margin-top:5px;">Cancelar</button>
-        </div>
-    </div>
-
     <script>
         let esAdmin = false;
         let datosGlobales = {};
-        
-        // Variables para manejar la promesa de la contraseña
-        let resolverPass;
-
-        // Función que muestra el modal y devuelve una promesa con el valor o null si cancela
-        function pedirPassword(titulo) {
-            return new Promise((resolve) => {
-                resolverPass = resolve;
-                document.getElementById('tituloPass').innerText = titulo;
-                document.getElementById('inputPass').value = '';
-                document.getElementById('modalPass').style.display = 'block';
-                document.getElementById('inputPass').focus();
-            });
-        }
-
-        function confirmarPassword() {
-            const val = document.getElementById('inputPass').value;
-            document.getElementById('modalPass').style.display = 'none';
-            if (resolverPass) resolverPass(val);
-        }
-
-        function cancelarPassword() {
-            document.getElementById('modalPass').style.display = 'none';
-            if (resolverPass) resolverPass(null);
-        }
 
         async function cargarDatos() {
-            const respuesta = await fetch('/api/datos');
+            const respuesta = await fetch('/api/datos'); 
             datosGlobales = await respuesta.json();
             renderTabla();
-        }
-
-        async function cargarRecaudacion() {
-            const respuesta = await fetch('/api/recaudacion');
-            const data = await respuesta.json();
-            renderTablaRecaudacion(data.recaudacion);
-        }
-
-        function renderTablaRecaudacion(recaudacion) {
-            const cuerpo = document.getElementById('cuerpo-recaudacion');
-            cuerpo.innerHTML = '';
-            for (const [mes, total] of Object.entries(recaudacion)) {
-                cuerpo.innerHTML += `<tr><td>${mes.toUpperCase()}</td><td>$${total}</td></tr>`;
-            }
         }
 
         function renderTabla() {
@@ -172,94 +107,63 @@
             }
         }
 
+        // Función para abrir el modal
         function verDetalle(nombre) {
             const meses = datosGlobales[nombre];
             let html = `<h2>${nombre}</h2><ul class="lista-meses">`;
             for (const [mes, info] of Object.entries(meses)) {
                 const estado = info.estado === 'PAGADO' ? '✅ Pagado' : '❌ Pendiente';
                 let extraHTML = info.extra > 0 ? ` (Extra $${info.extra})` : '';
-                let deudaHTML = info.deuda_extra > 0 ? ` <span style="color:#d9534f">(Debe $${info.deuda_extra})</span>` : '';
-                let metodoHTML = info.estado === 'PAGADO' && info.metodo ? ` (${info.metodo})` : '';
-
-                html += `<li>${mes.toUpperCase()}: ${estado}${metodoHTML}${extraHTML}${deudaHTML}`;
+                let deudaHTML = info.deuda > 0 ? ` (Debe $${info.deuda})` : '';
                 
-                if (esAdmin) {
-                    if (info.estado !== 'PAGADO') {
-                        html += ` <button class="admin-btn" onclick="toggleMetodo('${nombre}', '${mes}')">Pagar Mes</button>`;
-                        html += ` <div id="opciones-${nombre}-${mes}" style="display:none; margin-top:5px;">
-                                    <button class="metodo-btn" onclick="marcarPagado('${nombre}', '${mes}', 'efectivo', false)">💵 Efectivo</button>
-                                    <button class="metodo-btn" onclick="marcarPagado('${nombre}', '${mes}', 'transferencia', false)">🏦 Transf.</button>
-                                  </div>`;
-                    }
-                    if (info.deuda_extra > 0) {
-                        html += ` <button class="deuda-btn" onclick="pagarDeuda('${nombre}', '${mes}', '${info.metodo || 'efectivo'}')">Pagar Deuda $500</button>`;
-                    }
+                html += `<li>${mes.toUpperCase()}: ${estado}${extraHTML}${deudaHTML}`;
+                if (esAdmin && info.estado !== 'PAGADO') {
+                    html += ` <button class="admin-btn" onclick="marcarPagado('${nombre}', '${mes}')">Marcar Pagado</button>`;
                 }
                 html += `</li>`;
             }
             html += `</ul>`;
             
+            // Ponemos el contenido en el modal
             document.getElementById('detalle-persona').innerHTML = html;
+            // Mostramos el modal
             document.getElementById('miModal').style.display = 'block';
         }
 
-        function toggleMetodo(nombre, mes) {
-            const div = document.getElementById(`opciones-${nombre}-${mes}`);
-            if (div) div.style.display = div.style.display === 'none' ? 'block' : 'none';
+        // Función para cerrar el modal
+        function cerrarModal() {
+            document.getElementById('miModal').style.display = 'none';
         }
 
-        // Modificado para usar el modal de contraseña
-        async function marcarPagado(nombre, mes, metodo, pagarDeuda) {
-            const pass = await pedirPassword("Confirma contraseña de admin:");
-            if (!pass) return;
-
-            const respuesta = await fetch('/api/marcar_pagado', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ nombre, mes, password: pass, metodo, pagar_deuda: pagarDeuda })
-            });
-
-            if (respuesta.ok) {
-                await cargarDatos();
-                verDetalle(nombre); // Refrescar el detalle
-                if (esAdmin) await cargarRecaudacion();
-            } else {
-                alert("Error: Contraseña incorrecta.");
+        // Cerrar si haces clic fuera del cuadro blanco
+        window.onclick = function(event) {
+            const modal = document.getElementById('miModal');
+            if (event.target == modal) {
+                modal.style.display = 'none';
             }
         }
 
-        async function pagarDeuda(nombre, mes, metodo) {
-            await marcarPagado(nombre, mes, metodo, true);
+        function loginAdmin() {
+            const pass = prompt("Contraseña de administrador:");
+            // (Aquí puedes validar con un endpoint o dejarlo simple)
+            esAdmin = true; 
+            alert("Modo administrador activado. Ahora puedes marcar pagos.");
+            renderTabla();
         }
 
-        function cerrarModal() { document.getElementById('miModal').style.display = 'none'; }
-        window.onclick = function(event) {
-            const modal = document.getElementById('miModal');
-            if (event.target == modal) modal.style.display = 'none';
-        }
-
-        // Modificado para usar el modal de contraseña
-        async function loginAdmin() {
-            const pass = await pedirPassword("Contraseña de administrador:");
-            if (!pass) return;
-
-            const respuesta = await fetch('/api/login', {
+        async function marcarPagado(nombre, mes) {
+            const pass = prompt("Confirma tu contraseña de admin para modificar:");
+            const respuesta = await fetch('api/marcar_pagado', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ password: pass }) 
+                body: JSON.stringify({ nombre, mes, password: pass })
             });
-
             if (respuesta.ok) {
-                esAdmin = true;
-                alert("Modo administrador activado.");
-                renderTabla();
-                document.getElementById('tabla-recaudacion').style.display = 'block';
-                await cargarRecaudacion();
+                alert("¡Pago registrado en Google Sheets!");
+                cerrarModal(); // Cerramos el modal
+                cargarDatos(); // Recargar datos
             } else {
-                alert("Contraseña incorrecta.");
-                esAdmin = false;
-                renderTabla();
-                document.getElementById('tabla-recaudacion').style.display = 'none';
+                alert("Error: Contraseña incorrecta o persona no encontrada.");
             }
         }
 
