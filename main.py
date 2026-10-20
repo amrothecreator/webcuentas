@@ -100,8 +100,8 @@ def analizar_fila(mes, fila, mes_actual):
     pagado = "pagado" in celda(fila, 1)           # solo la columna B
     metodo = celda(fila, 2)
     texto = celda(fila, indice_recargo(mes))
-    # Los recargos existen SOLO en marzo y abril. Cualquier "debe" en otros meses se ignora.
-    aplica_recargo = mes_num <= 4
+    # Los recargos existen SOLO de marzo a junio. Cualquier "debe" en otros meses se ignora.
+    aplica_recargo = mes_num <= 6
     # En la hoja un recargo sin pagar puede decir "debe 500" o "500 pendiente".
     texto_pendiente = "debe" in texto or "pendiente" in texto
     debe = aplica_recargo and texto_pendiente
@@ -241,7 +241,7 @@ def pagar_lote(lote: Lote):
             t = tit[mes]
             a = analizar_fila(mes, fila, mes_actual)
             letra = "E" if mes == "abril" else "D"
-            texto_pagado = f"{a['recargo_pend']} pagado" if mes == "abril" else str(a["recargo_pend"])
+            texto_pagado = f"{a['recargo_pend']} pagado"
 
             if item.cuota and not a["pagado"]:
                 data.append({"range": f"'{t}'!B{row}:C{row}", "values": [["PAGADO", lote.metodo]]})
@@ -250,7 +250,7 @@ def pagar_lote(lote: Lote):
                 data.append({"range": f"'{t}'!{letra}{row}", "values": [[texto_pagado]]})
             elif item.cuota and not a["pagado"] and a["atrasado"] and not a["recargo_pagado"] and not a["debe"]:
                 # Se pagó la cuota atrasada pero no el recargo: queda registrado como deuda.
-                data.append({"range": f"'{t}'!{letra}{row}", "values": [["500 pendiente" if mes == "abril" else "debe 500"]]})
+                data.append({"range": f"'{t}'!{letra}{row}", "values": [["500 pendiente"]]})
 
         if data:
             for intento in range(2):

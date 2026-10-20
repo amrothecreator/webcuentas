@@ -5,72 +5,93 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Control de Cuotas</title>
     <style>
-        :root{--bg:#f3f5fb;--card:#fff;--text:#1f2937;--muted:#6b7280;--line:#e5e7eb;--brand:#4f46e5;--brand2:#7c3aed;--soft:#eef2ff;--ok:#15803d;--okbg:#dcfce7;--bad:#b91c1c;--badbg:#fee2e2;--shadow:0 6px 24px rgba(31,41,55,.08)}
-        @media(prefers-color-scheme:dark){:root{--bg:#0f172a;--card:#1e293b;--text:#e5e7eb;--muted:#94a3b8;--line:#334155;--soft:#2b3654;--ok:#86efac;--okbg:#14532d;--bad:#fca5a5;--badbg:#7f1d1d;--shadow:0 6px 24px rgba(0,0,0,.35)}}
+        :root{color-scheme:dark;--bg:#150d21;--card:#231535;--line:#3d2a5c;--text:#efe7fb;--muted:#a595c4;--brand:#8a5cc7;--brand2:#5b3a94;--soft:#322050;--eye:#ff3b4e;--teeth:#f6f1ff;--ok:#7ee0a5;--okbg:#173a2c;--bad:#ff8a95;--badbg:#4a1822;--shadow:0 8px 28px rgba(0,0,0,.45)}
         *{box-sizing:border-box}
-        body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text)}
+        body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--text);background:radial-gradient(900px 500px at 85% -10%,#3a2262 0%,transparent 60%),var(--bg);min-height:100vh}
         button{font:inherit;cursor:pointer;border:none}
-        .hero{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;padding:30px 20px 76px}
+        .transfer{background:#0d0716;border-bottom:1px solid var(--line);padding:10px 16px;display:flex;flex-wrap:wrap;gap:6px 22px;align-items:center;justify-content:center;font-size:.92rem}
+        .t-lab{color:var(--eye);font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:.75rem}
+        .btn-copiar{padding:5px 14px;border-radius:8px;background:var(--soft);color:var(--text);border:1px solid var(--brand)}
+        .btn-copiar:hover{background:var(--brand)}
+        .hero{position:relative;z-index:2;background:linear-gradient(135deg,var(--brand2),#3a2262);padding:30px 20px 38px}
+        .hero::after{content:"";position:absolute;left:0;right:0;top:100%;height:16px;background:conic-gradient(from 135deg at top,#0000,var(--teeth) 1deg 90deg,#0000 91deg) 50%/32px 100%}
         .hero-in,.wrap{max-width:960px;margin:0 auto}
-        .hero h1{margin:0;font-size:1.7rem}
-        .hero p{margin:6px 0 0;opacity:.85}
-        .wrap{padding:0 16px 40px;margin-top:-52px}
+        .hero-in{display:flex;justify-content:space-between;align-items:center;gap:16px}
+        .hero h1{margin:0;font-size:1.8rem;letter-spacing:.02em}
+        .hero p{margin:6px 0 0;color:#d8c8f2}
+        .ojos{display:flex;gap:14px}
+        .ojo{width:54px;height:30px;background:var(--eye);border-radius:60% 60% 50% 50%/70% 70% 40% 40%;position:relative;box-shadow:0 0 20px rgba(255,59,78,.6)}
+        .ojo:first-child{transform:rotate(14deg)}
+        .ojo:last-child{transform:rotate(-14deg)}
+        .ojo::after{content:"";position:absolute;left:50%;top:50%;width:6px;height:18px;margin:-9px 0 0 -3px;background:#fff;border-radius:3px}
+        .wrap{padding:36px 16px 40px}
         .toolbar{display:flex;gap:10px;margin-bottom:16px}
-        .toolbar input{flex:1;min-width:0;padding:13px 16px;border:none;border-radius:12px;background:var(--card);color:var(--text);font:inherit;box-shadow:var(--shadow);outline:none}
-        .toolbar input:focus{box-shadow:0 0 0 3px rgba(79,70,229,.35)}
-        .btn-admin{padding:13px 18px;border-radius:12px;background:var(--card);color:var(--brand);font-weight:600;box-shadow:var(--shadow);white-space:nowrap}
-        .btn-admin.activo{background:var(--okbg);color:var(--ok)}
-        .card{background:var(--card);border-radius:16px;box-shadow:var(--shadow);overflow-x:auto}
-        .sec{font-size:1.15rem;margin:0 0 12px}
+        .toolbar input{flex:1;min-width:0;padding:13px 16px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--text);font:inherit;outline:none}
+        .toolbar input:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(138,92,199,.35)}
+        .btn-admin{padding:13px 18px;border-radius:12px;background:var(--card);color:var(--text);font-weight:600;border:1px solid var(--brand);white-space:nowrap}
+        .btn-admin:hover{background:var(--soft)}
+        .btn-admin.activo{background:var(--okbg);color:var(--ok);border-color:var(--ok)}
+        .card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow-x:auto}
+        .sec{font-size:1.15rem;margin:0 0 12px;color:var(--brand)}
         table{width:100%;border-collapse:collapse}
-        th{padding:14px;text-align:left;font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line)}
+        th{padding:14px;text-align:left;font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line)}
         td{padding:13px 14px;border-bottom:1px solid var(--line)}
         tbody tr:last-child td{border-bottom:none}
         tbody tr:hover{background:var(--soft)}
         td:first-child{font-weight:600}
-        .badge{display:inline-block;padding:4px 12px;border-radius:999px;font-weight:700;font-size:.9rem}
-        .badge.ok{background:var(--okbg);color:var(--ok)}
-        .badge.mal{background:var(--badbg);color:var(--bad)}
-        .btn-ver{padding:7px 16px;border-radius:10px;background:var(--soft);color:var(--brand);font-weight:600}
-        .btn-ver:hover{background:var(--brand);color:#fff}
+        .badge,.tag{display:inline-block;padding:4px 12px;border-radius:999px;font-weight:700;font-size:.85rem}
+        .badge.ok,.tag.ok{background:var(--okbg);color:var(--ok)}
+        .badge.mal,.tag.mal{background:var(--badbg);color:var(--bad)}
+        .btn-ver{padding:7px 16px;border-radius:10px;background:var(--soft);color:var(--text);font-weight:600;border:1px solid var(--brand)}
+        .btn-ver:hover{background:var(--brand)}
 
-        .modal{display:none;position:fixed;z-index:1000;inset:0;background:rgba(15,23,42,.55);backdrop-filter:blur(3px);overflow-y:auto}
-        .modal-contenido{background:var(--card);margin:5% auto;padding:24px;border-radius:20px;width:92%;max-width:660px;box-shadow:0 20px 50px rgba(0,0,0,.3);position:relative;animation:sube .2s ease-out}
+        .modal{display:none;position:fixed;z-index:1000;inset:0;background:rgba(8,3,16,.78);backdrop-filter:blur(3px);overflow-y:auto}
+        .modal-contenido{background:var(--card);border:1px solid var(--line);margin:5% auto;padding:24px;border-radius:20px;width:92%;max-width:660px;box-shadow:0 20px 50px rgba(0,0,0,.6);position:relative;animation:sube .2s ease-out}
         @keyframes sube{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
-        .modal-contenido h2{margin:0 0 14px}
+        .modal-contenido h2{margin:0 0 14px;color:var(--brand)}
         .cerrar{position:absolute;right:16px;top:10px;color:var(--muted);font-size:30px;cursor:pointer;line-height:1}
-        .cerrar:hover{color:var(--text)}
+        .cerrar:hover{color:var(--eye)}
         .lista-meses{list-style:none;padding:0;margin:0}
         .lista-meses li{padding:12px 14px;margin-bottom:8px;border:1px solid var(--line);border-radius:12px}
         .rojo{color:var(--bad);font-weight:600}
         .gris{color:var(--muted)}
         .checks{margin-top:8px;display:flex;flex-wrap:wrap;gap:8px}
         .chk,.panel-admin label{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border:1px solid var(--line);border-radius:999px;cursor:pointer;user-select:none;margin:0}
-        .chk:has(input:checked),.panel-admin label:has(input:checked){background:var(--soft);border-color:var(--brand);color:var(--brand);font-weight:600}
-        .chk input{transform:none;margin:0}
+        .chk:has(input:checked),.panel-admin label:has(input:checked){background:var(--soft);border-color:var(--brand);color:#fff;font-weight:600}
+        .chk input{margin:0;accent-color:var(--brand)}
         .panel-admin{background:var(--soft);border-radius:14px;padding:14px;margin-top:14px}
         .panel-admin>div{margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-        .metodo-btn{padding:8px 14px;margin:0 6px 0 0;border-radius:10px;background:var(--card);color:var(--brand);font-weight:600;border:1px solid var(--line)}
+        .panel-admin input{accent-color:var(--brand)}
+        .metodo-btn{padding:8px 14px;margin:0 6px 0 0;border-radius:10px;background:var(--card);color:var(--text);font-weight:600;border:1px solid var(--line)}
         .metodo-btn:hover{border-color:var(--brand)}
         #resumen{font-weight:700;display:block}
-        .admin-btn{width:100%;padding:13px;margin-top:10px;border-radius:12px;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;font-weight:700}
+        .admin-btn{width:100%;padding:13px;margin-top:10px;border-radius:12px;background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;font-weight:700}
         .admin-btn:disabled{background:var(--line);color:var(--muted);cursor:not-allowed}
 
-        .modal-password{display:none;position:fixed;z-index:1100;inset:0;background:rgba(15,23,42,.7);backdrop-filter:blur(3px)}
-        .modal-password-contenido{background:var(--card);margin:18vh auto 0;padding:24px;border-radius:18px;width:320px;max-width:90%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.35)}
+        .modal-password{display:none;position:fixed;z-index:1100;inset:0;background:rgba(8,3,16,.85);backdrop-filter:blur(3px)}
+        .modal-password-contenido{background:var(--card);border:1px solid var(--line);margin:18vh auto 0;padding:24px;border-radius:18px;width:320px;max-width:90%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.6)}
         .modal-password input{width:100%;padding:12px;margin:10px 0;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--text);font:inherit}
         .modal-password button{width:100%;padding:12px;background:var(--brand);color:#fff;border-radius:10px;font-weight:600}
 
-        #guardando{display:none;position:fixed;right:16px;bottom:16px;background:#111827;color:#fff;padding:11px 18px;border-radius:999px;z-index:1200;box-shadow:var(--shadow);font-size:.9rem}
-        @media(max-width:600px){.hero h1{font-size:1.4rem}.toolbar{flex-direction:column}th,td{padding:10px 8px;font-size:.9rem}.modal-contenido{margin:3% auto;padding:18px}}
+        #guardando{display:none;position:fixed;right:16px;bottom:16px;background:var(--eye);color:#fff;padding:11px 18px;border-radius:999px;z-index:1200;box-shadow:var(--shadow);font-size:.9rem;font-weight:600}
+        @media(max-width:600px){.hero h1{font-size:1.4rem}.ojo{width:40px;height:23px}.toolbar{flex-direction:column}th,td{padding:10px 8px;font-size:.9rem}.modal-contenido{margin:3% auto;padding:18px}}
     </style>
 </head>
 <body>
-    <div class="hero"><div class="hero-in"><h1>💳 Control de Cuotas</h1><p>Marzo – Octubre</p></div></div>
+    <div class="transfer">
+        <span class="t-lab">Datos para transferir</span>
+        <span><b>Banco Estado</b></span>
+        <span>CuentaRut: <b id="cuenta">22843633-k</b></span>
+        <button class="btn-copiar" onclick="copiarCuenta(this)">Copiar</button>
+    </div>
+    <div class="hero"><div class="hero-in">
+        <div><h1>Control de Cuotas</h1><p>Marzo – Octubre</p></div>
+        <div class="ojos"><span class="ojo"></span><span class="ojo"></span></div>
+    </div></div>
     <div class="wrap">
     <div class="toolbar">
-        <input type="text" id="buscador" placeholder="🔍 Buscar persona..." onkeyup="filtrar()">
-        <button id="btn-admin" class="btn-admin" onclick="loginAdmin()">🔒 Soy Admin</button>
+        <input type="text" id="buscador" placeholder="Buscar persona..." onkeyup="filtrar()">
+        <button id="btn-admin" class="btn-admin" onclick="loginAdmin()">Soy Admin</button>
     </div>
     <div class="card"><table id="tabla">
         <thead>
@@ -86,7 +107,7 @@
     </table></div>
 
     <div id="tabla-recaudacion" style="display:none; margin-top:24px;">
-        <h2 class="sec">💰 Recaudado por Transferencia</h2>
+        <h2 class="sec">Recaudado por transferencia</h2>
         <div class="card"><table>
             <thead><tr><th>Mes</th><th>Total</th></tr></thead>
             <tbody id="cuerpo-recaudacion"></tbody>
@@ -223,8 +244,8 @@
             for (const [mes, info] of Object.entries(meses)) {
                 const pagado = info.estado === 'PAGADO';
                 const estado = pagado
-                    ? `✅ Pagado${info.metodo ? ` (${esc(info.metodo)})` : ''}`
-                    : `❌ Pendiente ($${VALOR_CUOTA})`;
+                    ? `<span class="tag ok">Pagado</span>${info.metodo ? ` <span class="gris">${esc(info.metodo)}</span>` : ''}`
+                    : `<span class="tag mal">Pendiente $${VALOR_CUOTA}</span>`;
                 let rec = '';
                 if (info.recargo_pendiente > 0) rec = ` <span class="rojo">· Recargo $${info.recargo_pendiente} pendiente</span>`;
                 else if (info.recargo_pagado) rec = ` <span class="gris">· Recargo pagado</span>`;
@@ -250,8 +271,8 @@
                     <button class="metodo-btn" id="btn-sel-todo">Seleccionar todo lo pendiente</button>
                     <button class="metodo-btn" id="btn-limpiar">Limpiar</button>
                     <div style="margin-top:8px">Método de pago de las cuotas:
-                        <label><input type="radio" name="metodo" value="efectivo" ${metodoSel === 'efectivo' ? 'checked' : ''}> 💵 Efectivo</label>
-                        <label><input type="radio" name="metodo" value="transferencia" ${metodoSel === 'transferencia' ? 'checked' : ''}> 🏦 Transferencia</label>
+                        <label><input type="radio" name="metodo" value="efectivo" ${metodoSel === 'efectivo' ? 'checked' : ''}> Efectivo</label>
+                        <label><input type="radio" name="metodo" value="transferencia" ${metodoSel === 'transferencia' ? 'checked' : ''}> Transferencia</label>
                     </div>
                     <div id="resumen"></div>
                     <button class="admin-btn" id="btn-registrar">Registrar seleccionados</button>
@@ -391,7 +412,7 @@
         function actualizarIndicador() {
             const el = document.getElementById('guardando');
             el.style.display = pendientes > 0 ? 'block' : 'none';
-            el.textContent = `⏳ Guardando… (${pendientes} pendiente${pendientes === 1 ? '' : 's'})`;
+            el.textContent = `Guardando… (${pendientes} pendiente${pendientes === 1 ? '' : 's'})`;
         }
 
         window.addEventListener('beforeunload', e => {
@@ -418,7 +439,7 @@
             if (respuesta.ok) {
                 esAdmin = true;
                 adminPass = pass;
-                const ba = document.getElementById('btn-admin'); ba.textContent = '🔓 Admin activo'; ba.classList.add('activo');
+                const ba = document.getElementById('btn-admin'); ba.textContent = 'Admin activo'; ba.classList.add('activo');
                 alert('Modo administrador activado.');
                 renderTabla();
                 document.getElementById('tabla-recaudacion').style.display = 'block';
@@ -427,7 +448,7 @@
                 alert('Contraseña incorrecta.');
                 esAdmin = false;
                 adminPass = '';
-                const bb = document.getElementById('btn-admin'); bb.textContent = '🔒 Soy Admin'; bb.classList.remove('activo');
+                const bb = document.getElementById('btn-admin'); bb.textContent = 'Soy Admin'; bb.classList.remove('activo');
                 renderTabla();
                 document.getElementById('tabla-recaudacion').style.display = 'none';
             }
@@ -439,6 +460,13 @@
                 const nombre = fila.cells[0] ? fila.cells[0].textContent.toLowerCase() : '';
                 fila.style.display = nombre.includes(texto) ? '' : 'none';
             });
+        }
+
+        function copiarCuenta(btn) {
+            const txt = document.getElementById('cuenta').textContent.trim();
+            const listo = () => { btn.textContent = 'Copiado'; setTimeout(() => { btn.textContent = 'Copiar'; }, 1500); };
+            if (navigator.clipboard) navigator.clipboard.writeText(txt).then(listo).catch(() => {});
+            else { const t = document.createElement('textarea'); t.value = txt; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); listo(); }
         }
 
         sincronizar();
