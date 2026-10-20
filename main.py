@@ -158,6 +158,13 @@ def read_index():
     return FileResponse("index.html")
 
 
+@app.get("/gengar.png")
+def gengar_png():
+    if not os.path.exists("gengar.png"):
+        raise HTTPException(status_code=404, detail="Falta gengar.png")
+    return FileResponse("gengar.png", media_type="image/png")
+
+
 @app.get("/api/datos")
 def obtener_datos():
     hojas = leer_hojas()
